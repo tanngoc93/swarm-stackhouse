@@ -1,6 +1,8 @@
 # Swarm Cleanup
 
-`cleanup.sh` is a small Bash utility that removes unused Docker images and containers from a node. It works on standalone Docker hosts and Swarm nodes. When run on a Swarm manager it protects images that are in use by services.
+`cleanup.sh` is a Bash utility that removes unused Docker images and containers from a node.
+It works on both standalone Docker hosts and Swarm nodes. When executed on a Swarm manager
+it also protects images referenced by Swarm services.
 
 ## Requirements
 
@@ -10,7 +12,8 @@
 
 ## Usage
 
-Provide the target repository via positional argument or `IMAGE_REPO` environment variable:
+Run the script locally by providing the target repository via positional argument or the
+`IMAGE_REPO` environment variable:
 
 ```bash
 # using positional argument
@@ -27,37 +30,39 @@ IMAGE_REPO=myorg/myimage DRY_RUN=1 ./cleanup.sh
 ```
 
 `RM_TIMEOUT` configures a timeout for each `docker rmi`/untag command (default `20s`).
-
 The script exits with an error if `IMAGE_REPO` is not specified.
 
 ## Running in Docker Swarm
 
-To clean up every node in a Swarm cluster you can deploy `cleanup.sh` as a
-one-shot global service. A sample stack file is provided at
-`docker/docker-cleaner-stack.yml`.
+The repository also includes tooling to clean every node in a Swarm cluster.
 
-1. Set the image repository you want to purge and deploy the stack:
+### Option 1: Convenience script
 
-   ```bash
-   IMAGE_REPO=myorg/myimage docker stack deploy \
-     -c docker/docker-cleaner-stack.yml swarm-cleanup
-   ```
+Use `swarm_image_cleanup.sh` to deploy a temporary stack, wait for all cleanup tasks to finish, and then remove the stack automatically:
 
-   The service will run once on each node, remove unused images matching the
-   repository and then exit.
+```bash
+IMAGE_REPO=myorg/myimage ./swarm_image_cleanup.sh
+```
 
-2. After all tasks complete, remove the stack:
+The script uses `docker/docker-cleaner-stack.yml` to run a one-shot global service that executes `cleanup.sh` on each node.
 
-   ```bash
-   docker stack rm swarm-cleanup
-   ```
+### Option 2: Manual stack deployment
 
-The stack file clones this repository on each node at run time so you do not
-need to pre-distribute the script.
+If you prefer manual control you can deploy the stack yourself:
+
+```bash
+IMAGE_REPO=myorg/myimage docker stack deploy \
+  -c docker/docker-cleaner-stack.yml swarm-cleanup
+
+# after the tasks are finished
+docker stack rm swarm-cleanup
+```
+
+The stack file clones this repository on each node at run time so you do not need to pre-distribute the script.
 
 ## Development
 
-Contributions are welcome. Please run `bash -n cleanup.sh` before submitting changes.
+Contributions are welcome. Please run `bash -n cleanup.sh swarm_image_cleanup.sh` before submitting changes.
 
 ## License
 
