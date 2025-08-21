@@ -1,0 +1,26 @@
+services:
+  swarm_cleanup:
+    image: alpine:3.19
+    environment:
+      REPO_URL: "https://github.com/tanngoc93/swarm_cleanup.git"
+      REPO_DIR: "/tmp/swarm_cleanup"
+      SCRIPT: "cleanup.sh"
+      IMAGE_REPO: "${IMAGE_REPO}"
+    command: >
+      sh -c "
+        set -e;
+        echo '--- [Swarm Cleanup] running on node: '$$(hostname);
+        apk add --no-cache git bash docker-cli >/dev/null;
+        rm -rf $$REPO_DIR &&
+        git clone --depth=1 $$REPO_URL $$REPO_DIR;
+        chmod +x $$REPO_DIR/$$SCRIPT;
+        IMAGE_REPO=$$IMAGE_REPO bash $$REPO_DIR/$$SCRIPT;
+        echo '--- Done on node: '$$(hostname);
+        exit 0
+      "
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      mode: global
+      restart_policy:
+        condition: none
