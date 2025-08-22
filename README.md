@@ -34,15 +34,14 @@ The script exits with an error if `IMAGE_REPO` is not specified.
 ## Deploying a stack
 
 `deploy_stack_with_cleanup.sh` deploys or updates a Docker Swarm stack and then runs the cleanup
-routine to remove unused images. It requires `IMAGE_REPO`, `STACK_NAME`, `STACK_FILE`,
-`CLEANUP_STACK_FILE`, and `CLEANUP_STACK_NAME` environment variables.
+routine to remove unused images. It requires `IMAGE_REPO`, `STACK_NAME`, and `STACK_FILE`
+environment variables. `CLEANUP_STACK_FILE` and `CLEANUP_STACK_NAME` are optional and
+default to `docker/docker-cleaner-stack.yml` and `swarm-cleanup` respectively.
 
 ```bash
 IMAGE_REPO=myorg/myimage \\
 STACK_NAME=feedmama \\
 STACK_FILE=/path/to/stack.yml \\
-CLEANUP_STACK_FILE=docker/docker-cleaner-stack.yml \\
-CLEANUP_STACK_NAME=swarm-cleanup \\
 ./deploy_stack_with_cleanup.sh
 ```
 
@@ -55,10 +54,10 @@ The repository also includes tooling to clean every node in a Swarm cluster.
 
 ### Option 1: Convenience script
 
-Use `scripts/swarm_cleanup.sh` to deploy a temporary stack, wait for all cleanup tasks to finish, and then remove the stack automatically. It requires `IMAGE_REPO`, `STACK_FILE`, and `STACK_NAME` environment variables:
+Use `scripts/swarm_cleanup.sh` to deploy a temporary stack, wait for all cleanup tasks to finish, and then remove the stack automatically. It requires `IMAGE_REPO` and accepts optional `STACK_FILE` and `STACK_NAME` variables:
 
 ```bash
-IMAGE_REPO=myorg/myimage STACK_FILE=docker/docker-cleaner-stack.yml STACK_NAME=swarm-cleanup ./scripts/swarm_cleanup.sh
+IMAGE_REPO=myorg/myimage ./scripts/swarm_cleanup.sh
 ```
 
 The stack file runs `scripts/docker_image_cleanup.sh` on each node.

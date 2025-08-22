@@ -10,8 +10,8 @@
 #   LOG_FILE        - Output log (default: /var/log/deploy_${STACK_NAME}.log)
 #   LOCK_FILE       - PID lock file (default: /tmp/deploy_${STACK_NAME}.pid)
 #   CLEANUP_SCRIPT     - Script to run after deployment (default: ./scripts/swarm_cleanup.sh)
-#   CLEANUP_STACK_FILE - Stack file used by the cleanup script (required)
-#   CLEANUP_STACK_NAME - Stack name used by the cleanup script (required)
+#   CLEANUP_STACK_FILE - Stack file used by the cleanup script (default: ./docker/docker-cleaner-stack.yml)
+#   CLEANUP_STACK_NAME - Stack name used by the cleanup script (default: swarm-cleanup)
 
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 IMAGE_REPO="${IMAGE_REPO:-}"
@@ -21,11 +21,11 @@ LOG_FILE="${LOG_FILE:-/var/log/deploy_${STACK_NAME}.log}"
 LOCK_FILE="${LOCK_FILE:-/tmp/deploy_${STACK_NAME}.pid}"
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 CLEANUP_SCRIPT="${CLEANUP_SCRIPT:-$SCRIPT_DIR/scripts/swarm_cleanup.sh}"
-CLEANUP_STACK_FILE="${CLEANUP_STACK_FILE:-}"
-CLEANUP_STACK_NAME="${CLEANUP_STACK_NAME:-}"
+CLEANUP_STACK_FILE="${CLEANUP_STACK_FILE:-$SCRIPT_DIR/docker/docker-cleaner-stack.yml}"
+CLEANUP_STACK_NAME="${CLEANUP_STACK_NAME:-swarm-cleanup}"
 
-if [[ -z "$IMAGE_REPO" || -z "$STACK_NAME" || -z "$STACK_FILE" || -z "$CLEANUP_STACK_FILE" || -z "$CLEANUP_STACK_NAME" ]]; then
-  echo "IMAGE_REPO, STACK_NAME, STACK_FILE, CLEANUP_STACK_FILE and CLEANUP_STACK_NAME must be set" >&2
+if [[ -z "$IMAGE_REPO" || -z "$STACK_NAME" || -z "$STACK_FILE" ]]; then
+  echo "IMAGE_REPO, STACK_NAME and STACK_FILE must be set" >&2
   exit 1
 fi
 

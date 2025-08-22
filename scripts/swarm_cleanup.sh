@@ -3,15 +3,21 @@ set -euo pipefail
 
 # Environment variables:
 #   IMAGE_REPO - Repository to clean (required)
-#   STACK_FILE - Path to the cleanup stack file (required)
-#   STACK_NAME - Name of the cleanup stack (required)
+#   STACK_FILE - Path to the cleanup stack file (default: ../docker/docker-cleaner-stack.yml)
+#   STACK_NAME - Name of the cleanup stack (default: swarm-cleanup)
 
-STACK_FILE="${STACK_FILE:-}"
-STACK_NAME="${STACK_NAME:-}"
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+STACK_FILE="${STACK_FILE:-$SCRIPT_DIR/../docker/docker-cleaner-stack.yml}"
+STACK_NAME="${STACK_NAME:-swarm-cleanup}"
 IMAGE_REPO="${IMAGE_REPO:-}"
 
-if [[ -z "$IMAGE_REPO" || -z "$STACK_FILE" || -z "$STACK_NAME" ]]; then
-  echo "IMAGE_REPO, STACK_FILE and STACK_NAME must be set" >&2
+if [[ -z "$IMAGE_REPO" ]]; then
+  echo "IMAGE_REPO must be set" >&2
+  exit 1
+fi
+
+if [[ ! -f "$STACK_FILE" ]]; then
+  echo "Stack file not found: $STACK_FILE" >&2
   exit 1
 fi
 
