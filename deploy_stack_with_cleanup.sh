@@ -9,7 +9,7 @@
 #   STACK_FILE      - Path to stack file (required)
 #   LOG_FILE        - Output log (default: /var/log/deploy_${STACK_NAME}.log)
 #   LOCK_FILE       - PID lock file (default: /tmp/deploy_${STACK_NAME}.pid)
-#   CLEANUP_SCRIPT     - Script to run after deployment (default: ../swarm_cleanup.sh)
+#   CLEANUP_SCRIPT     - Script to run after deployment (default: ./scripts/swarm_cleanup.sh)
 #   CLEANUP_STACK_FILE - Stack file used by the cleanup script (required)
 #   CLEANUP_STACK_NAME - Stack name used by the cleanup script (required)
 
@@ -20,7 +20,7 @@ STACK_FILE="${STACK_FILE:-}"
 LOG_FILE="${LOG_FILE:-/var/log/deploy_${STACK_NAME}.log}"
 LOCK_FILE="${LOCK_FILE:-/tmp/deploy_${STACK_NAME}.pid}"
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-CLEANUP_SCRIPT="${CLEANUP_SCRIPT:-$SCRIPT_DIR/../swarm_cleanup.sh}"
+CLEANUP_SCRIPT="${CLEANUP_SCRIPT:-$SCRIPT_DIR/scripts/swarm_cleanup.sh}"
 CLEANUP_STACK_FILE="${CLEANUP_STACK_FILE:-}"
 CLEANUP_STACK_NAME="${CLEANUP_STACK_NAME:-}"
 
