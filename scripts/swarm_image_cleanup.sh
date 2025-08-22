@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-STACK_FILE="$(dirname "$0")/docker/docker-cleaner-stack.yml"
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+STACK_FILE="$SCRIPT_DIR/../docker/docker-cleaner-stack.yml"
 STACK_NAME="cleanup"
 
 echo "🚀 Deploy cleanup stack..."

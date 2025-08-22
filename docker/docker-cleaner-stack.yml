@@ -4,7 +4,7 @@ services:
     environment:
       REPO_URL: "https://github.com/tanngoc93/swarm_cleanup.git"
       REPO_DIR: "/tmp/swarm_cleanup"
-      SCRIPT: "cleanup.sh"
+      SCRIPT: "scripts/cleanup.sh"
       IMAGE_REPO: "${IMAGE_REPO}"
     command: >
       sh -c "
