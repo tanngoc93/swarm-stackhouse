@@ -1,27 +1,31 @@
 #!/bin/bash
 
-# deploy_stack.sh - Deploy or update a Docker Swarm stack and clean up old images.
+# deploy_stack_with_cleanup.sh - Deploy or update a Docker Swarm stack and clean up old images.
 #
-# Environment variables (all overridable):
+# Environment variables:
 #   IMAGE_TAG       - Image tag to deploy (default: latest)
 #   IMAGE_REPO      - Repository for the image (required)
 #   STACK_NAME      - Name of the stack (required)
-#   STACK_FILE      - Path to stack file (default: ./docker/stack.yml)
+#   STACK_FILE      - Path to stack file (required)
 #   LOG_FILE        - Output log (default: /var/log/deploy_${STACK_NAME}.log)
 #   LOCK_FILE       - PID lock file (default: /tmp/deploy_${STACK_NAME}.pid)
-#   CLEANUP_SCRIPT  - Script to run after deployment (default: swarm_image_cleanup.sh)
+#   CLEANUP_SCRIPT     - Script to run after deployment (default: ../swarm_cleanup.sh)
+#   CLEANUP_STACK_FILE - Stack file used by the cleanup script (required)
+#   CLEANUP_STACK_NAME - Stack name used by the cleanup script (required)
 
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 IMAGE_REPO="${IMAGE_REPO:-}"
 STACK_NAME="${STACK_NAME:-}"
-STACK_FILE="${STACK_FILE:-./docker/stack.yml}"
+STACK_FILE="${STACK_FILE:-}"
 LOG_FILE="${LOG_FILE:-/var/log/deploy_${STACK_NAME}.log}"
 LOCK_FILE="${LOCK_FILE:-/tmp/deploy_${STACK_NAME}.pid}"
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-CLEANUP_SCRIPT="${CLEANUP_SCRIPT:-$SCRIPT_DIR/swarm_image_cleanup.sh}"
+CLEANUP_SCRIPT="${CLEANUP_SCRIPT:-$SCRIPT_DIR/../swarm_cleanup.sh}"
+CLEANUP_STACK_FILE="${CLEANUP_STACK_FILE:-}"
+CLEANUP_STACK_NAME="${CLEANUP_STACK_NAME:-}"
 
-if [[ -z "$IMAGE_REPO" || -z "$STACK_NAME" ]]; then
-  echo "IMAGE_REPO and STACK_NAME must be set" >&2
+if [[ -z "$IMAGE_REPO" || -z "$STACK_NAME" || -z "$STACK_FILE" || -z "$CLEANUP_STACK_FILE" || -z "$CLEANUP_STACK_NAME" ]]; then
+  echo "IMAGE_REPO, STACK_NAME, STACK_FILE, CLEANUP_STACK_FILE and CLEANUP_STACK_NAME must be set" >&2
   exit 1
 fi
 
@@ -120,7 +124,7 @@ fi
     log "⏳ Waiting 30s before cleanup..."
     sleep 30
     log "🧹 Running swarm image cleanup..."
-    IMAGE_REPO="$IMAGE_REPO" bash "$CLEANUP_SCRIPT" >> "$LOG_FILE" 2>&1
+    STACK_FILE="$CLEANUP_STACK_FILE" STACK_NAME="$CLEANUP_STACK_NAME" IMAGE_REPO="$IMAGE_REPO" bash "$CLEANUP_SCRIPT" >> "$LOG_FILE" 2>&1
     log "✅ Swarm image cleanup finished..."
   else
     log "[⚠️] Cleanup script not found or not executable: $CLEANUP_SCRIPT"

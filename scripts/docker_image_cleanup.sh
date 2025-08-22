@@ -1,21 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
-# cleanup.sh - remove unused Docker images for a given repository
+# docker_image_cleanup.sh - remove unused Docker images for a given repository
 #
 # Usage:
-#   IMAGE_REPO=myorg/myimage ./cleanup.sh
-#   ./cleanup.sh myorg/myimage
+#   IMAGE_REPO=myorg/myimage ./scripts/docker_image_cleanup.sh
 #
 # Environment variables:
+#   IMAGE_REPO      Target repository (required)
 #   DRY_RUN=1       Preview deletions without removing anything
 #   RM_TIMEOUT=20s  Timeout for docker rmi/untag commands
 
 # === CONFIG (overridable) ===
-# Repo to clean: CLI arg > ENV (required)
-IMAGE_REPO="${1:-${IMAGE_REPO:-}}"
+# Repo to clean from environment (required)
+IMAGE_REPO="${IMAGE_REPO:-}"
 if [[ -z "$IMAGE_REPO" ]]; then
-  echo "Error: IMAGE_REPO is required. Set IMAGE_REPO env or pass as first argument." >&2
+  echo "Error: IMAGE_REPO is required. Set IMAGE_REPO environment variable." >&2
   exit 1
 fi
 # Dry-run: set to 1 to preview deletions (no actual removals)
