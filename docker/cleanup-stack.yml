@@ -4,11 +4,11 @@ services:
     environment:
       REPO_URL: "${REPO_URL:-https://github.com/tanngoc93/swarm_cleanup.git}"
       REPO_DIR: "${REPO_DIR:-/tmp/swarm_cleanup}"
-      SCRIPT: "${SCRIPT:-scripts/docker_image_cleanup.sh}"
+      SCRIPT: "${SCRIPT:-scripts/cleanup_docker_images.sh}"
       IMAGE_REPO: "${IMAGE_REPO}"
       DRY_RUN: "${DRY_RUN:-0}"
       RM_TIMEOUT: "${RM_TIMEOUT:-20s}"
-      RUN_AT: "${RUN_AT}"
+      RUN_TIMESTAMP: "${RUN_TIMESTAMP}"
     command: >
       sh -c "
         set -e;
