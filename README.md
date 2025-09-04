@@ -30,10 +30,10 @@ Collection of Bash utilities to deploy Docker Swarm stacks, clean up old images,
 
 ## Logs and debugging
 
-* Logs are written to `/var/log/deploy_<STACK_NAME>_uniq.log`. Tail them with:
+* Logs are written to `log/deploy_<STACK_NAME>_uniq.log` in the repository root. Tail them with:
 
   ```bash
-  tail -f /var/log/deploy_<STACK_NAME>_uniq.log
+  tail -f log/deploy_<STACK_NAME>_uniq.log
   ```
 
 * For verbose debugging output, run the deployment script with `bash -x`:
