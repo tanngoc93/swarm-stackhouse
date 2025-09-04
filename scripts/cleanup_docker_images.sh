@@ -69,22 +69,22 @@ remove_image_and_tags() {
   local removed_any=0
   local deleted_by_id=0
 
-  mapfile -t REPO_TAGS < <(
-    docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' |
-      awk -v id="$img_id" -v repo="$IMAGE_REPO" '$2==id && index($1, repo ":")==1 { print $1 }'
+  mapfile -t REPO_REFS < <(
+    docker inspect --format='{{range .RepoTags}}{{.}}{{"\n"}}{{end}}{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' "$img_id" 2>/dev/null |
+      grep -E "^${IMAGE_REPO}(:|@)" || true
   )
 
-  for t in "${REPO_TAGS[@]}"; do
-    [[ -z "$t" ]] && continue
+  for ref in "${REPO_REFS[@]}"; do
+    [[ -z "$ref" || "$ref" == "$IMAGE_REPO:<none>" ]] && continue
     if [[ "$DRY_RUN" -eq 1 ]]; then
-      log_message "🧪 [DRY RUN] Would untag: $t"
+      log_message "🧪 [DRY RUN] Would untag: $ref"
       removed_any=1
     else
-      if OUT=$(execute_with_timeout docker rmi "$t" 2>&1); then
-        log_message "🏷️  Untagged: $t"
+      if OUT=$(execute_with_timeout docker rmi "$ref" 2>&1); then
+        log_message "🏷️  Untagged: $ref"
         removed_any=1
       else
-        log_message "[⚠️] Failed to untag $t — $OUT"
+        log_message "[⚠️] Failed to untag $ref — $OUT"
       fi
     fi
   done
