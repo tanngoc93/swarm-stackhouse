@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # cleanup_docker_images.sh - remove unused Docker images for a given repository
@@ -12,24 +12,21 @@ set -euo pipefail
 #   RM_TIMEOUT=20s  Timeout for docker rmi/untag commands
 
 # === CONFIG (overridable) ===
-# Repo to clean from environment (required)
 IMAGE_REPO="${IMAGE_REPO:-}"
+DRY_RUN="${DRY_RUN:-0}"
+RM_TIMEOUT="${RM_TIMEOUT:-20s}"
+
 if [[ -z "$IMAGE_REPO" ]]; then
   echo "Error: IMAGE_REPO is required. Set IMAGE_REPO environment variable." >&2
   exit 1
 fi
-# Dry-run: set to 1 to preview deletions (no actual removals)
-DRY_RUN="${DRY_RUN:-0}"
-# Max time for each docker rmi/untag command
-RM_TIMEOUT="${RM_TIMEOUT:-20s}"
 
 # === State & logging ===
 DELETED_IMAGE_COUNT=0
 log_message() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"; }
 
-# Always print a final summary even if something fails in the middle
 print_cleanup_summary() {
-  if [[ "${DRY_RUN}" -eq 1 ]]; then
+  if [[ "$DRY_RUN" -eq 1 ]]; then
     log_message "✅ DRY RUN complete. Images that would have been deleted: ${DELETED_IMAGE_COUNT}"
   else
     log_message "✅ Cleanup complete. Total images deleted: ${DELETED_IMAGE_COUNT}"
@@ -51,78 +48,13 @@ get_primary_tag() {
   docker inspect --format='{{index .RepoTags 0}}' "$1" 2>/dev/null || echo "<untagged>"
 }
 
-log_message "🧹 Starting image cleanup for repo: $IMAGE_REPO"
-
-# Pre-flight: Docker must be reachable
-if ! docker info >/dev/null 2>&1; then
-  log_message "[❌] Docker daemon not reachable."
-  exit 1
-fi
-
-# Swarm detection: distinguish manager vs worker
-if docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null | grep -qi '^active$'; then
-  SWARM_ACTIVE=1
-  SWARM_MANAGER=$(docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null | tr '[:upper:]' '[:lower:]')
-  if [[ "$SWARM_MANAGER" == "true" ]]; then
-    log_message "ℹ️ Swarm mode: active (manager)"
-  else
-    log_message "ℹ️ Swarm mode: active (worker)"
-  fi
-else
-  SWARM_ACTIVE=0
-  SWARM_MANAGER="false"
-  log_message "ℹ️ Swarm mode: inactive (service digest check will be empty)"
-fi
-
-# === STEP 1: Remove non-running containers ===
-log_message "🧯 Removing exited containers (if any)..."
-docker ps -aq -f status=exited | xargs -r docker rm >/dev/null 2>&1 || true
-
-# Also proactively remove non-running containers for this repo (created/exited/paused/dead)
-log_message "🧯 Removing non-running containers for repo: $IMAGE_REPO"
-mapfile -t STALE_CONTAINERS < <(
-  docker ps -a \
-    --filter "ancestor=$IMAGE_REPO" \
-    --filter "status=created" \
-    --filter "status=exited" \
-    --filter "status=dead" \
-    --filter "status=paused" \
-    --format '{{.ID}}'
-)
-if ((${#STALE_CONTAINERS[@]})); then
-  printf '%s\n' "${STALE_CONTAINERS[@]}" | xargs -r docker rm -f >/dev/null 2>&1 || true
-  log_message "🧯 Removed ${#STALE_CONTAINERS[@]} non-running container(s) for $IMAGE_REPO"
-else
-  log_message "ℹ️ No non-running containers for $IMAGE_REPO"
-fi
-
-# === STEP 2: Remove dangling images (untagged layers) ===
-log_message "🧽 Removing dangling images (if any)..."
-docker images -f dangling=true -q | xargs -r docker rmi -f >/dev/null 2>&1 || true
-
-# === STEP 3: Collect service image digests (manager only) ===
-USED_SERVICE_DIGESTS=()
-if [[ "$SWARM_ACTIVE" -eq 1 && "$SWARM_MANAGER" == "true" ]]; then
-  mapfile -t USED_SERVICE_DIGESTS < <(
-    docker service ls --format '{{.ID}}' 2>/dev/null \
-    | xargs -r -n1 docker service inspect --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null \
-    | awk -F'@' 'NF==2{print $2}' \
-    | sort -u
-  )
-  log_message "🔎 Found ${#USED_SERVICE_DIGESTS[@]} service image digest(s) in use."
-else
-  log_message "🔎 Skipping service digest collection (not a manager)."
-fi
-
 # Helper: check if a local image ID is referenced by any Swarm service (by digest)
 image_used_by_service() {
   local img_id="$1"
-  # Get all repo digests for this local image ID
   mapfile -t DIGESTS < <(
-    docker inspect --format='{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' "$img_id" 2>/dev/null \
-    | awk -F'@' 'NF==2{print $2}'
+    docker inspect --format='{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' "$img_id" 2>/dev/null |
+      awk -F'@' 'NF==2{print $2}'
   )
-  # If there is any intersection with USED_SERVICE_DIGESTS, consider it used
   for d in "${DIGESTS[@]:-}"; do
     for u in "${USED_SERVICE_DIGESTS[@]:-}"; do
       [[ "$d" == "$u" ]] && return 0
@@ -137,16 +69,11 @@ remove_image_and_tags() {
   local removed_any=0
   local deleted_by_id=0
 
-  # Get all repo:tag entries that point to this image ID, restricted to the target repo.
-  # Using 'docker images' avoids empty lines/null RepoTags that may appear with 'docker inspect'.
   mapfile -t REPO_TAGS < <(
-    docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' \
-    | awk -v id="$img_id" -v repo="$IMAGE_REPO" '
-        $2==id && index($1, repo ":")==1 { print $1 }
-      '
+    docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' |
+      awk -v id="$img_id" -v repo="$IMAGE_REPO" '$2==id && index($1, repo ":")==1 { print $1 }'
   )
 
-  # Untag each repo tag; skip any accidental empty values
   for t in "${REPO_TAGS[@]}"; do
     [[ -z "$t" ]] && continue
     if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -162,10 +89,8 @@ remove_image_and_tags() {
     fi
   done
 
-  # Try deleting by ID (may still be referenced by other repos on this node)
   if [[ "$DRY_RUN" -eq 1 ]]; then
     log_message "🧪 [DRY RUN] Would delete by ID: $img_id"
-    return 0
   else
     if OUT=$(execute_with_timeout docker rmi -f "$img_id" 2>&1); then
       log_message "🗑  Deleted image by ID: $img_id"
@@ -175,7 +100,6 @@ remove_image_and_tags() {
     fi
   fi
 
-  # Consider cleaned if at least one untag happened or the ID was removed
   if [[ "$removed_any" -eq 1 || "$deleted_by_id" -eq 1 ]]; then
     return 0
   else
@@ -183,45 +107,92 @@ remove_image_and_tags() {
   fi
 }
 
-# === STEP 4: Remove all unused images for this repo (keep only images in use) ===
-log_message "🧾 Scanning local images for repo: $IMAGE_REPO"
+main() {
+  log_message "🧹 Starting image cleanup for repo: $IMAGE_REPO"
 
-# Unique list of image IDs for this repo
-mapfile -t IMAGE_ID_LIST < <(docker images "$IMAGE_REPO" --format '{{.ID}}' | sort -u)
-log_message "🧾 Found ${#IMAGE_ID_LIST[@]} image ID(s) for repo: $IMAGE_REPO"
-
-# Turn off errexit during the cleanup loop to prevent premature exit on any single failure
-set +e
-for IMG_ID in "${IMAGE_ID_LIST[@]:-}"; do
-  # Get a friendly tag name for logs (do not fail the loop if inspect fails)
-  PRIMARY_TAG="$(get_primary_tag "$IMG_ID")"
-
-  # Check if any running container uses this image (robust, no pipeline in condition)
-  RUNNING_CONTAINER_ID=""
-  RUNNING_CONTAINER_ID=$(docker ps --filter "ancestor=$IMG_ID" --format '{{.ID}}' | head -n1) || RUNNING_CONTAINER_ID=""
-  if [[ -n "$RUNNING_CONTAINER_ID" ]]; then
-    log_message "🔒 In use by RUNNING container: $PRIMARY_TAG ($IMG_ID)"
-    continue
+  if ! docker info >/dev/null 2>&1; then
+    log_message "[❌] Docker daemon not reachable."
+    exit 1
   fi
 
-  # If manager, additionally protect images whose digest is used by any Swarm service
+  if docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null | grep -qi '^active$'; then
+    SWARM_ACTIVE=1
+    SWARM_MANAGER=$(docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null | tr '[:upper:]' '[:lower:]')
+    if [[ "$SWARM_MANAGER" == "true" ]]; then
+      log_message "ℹ️ Swarm mode: active (manager)"
+    else
+      log_message "ℹ️ Swarm mode: active (worker)"
+    fi
+  else
+    SWARM_ACTIVE=0
+    SWARM_MANAGER="false"
+    log_message "ℹ️ Swarm mode: inactive (service digest check will be empty)"
+  fi
+
+  log_message "🧯 Removing exited containers (if any)..."
+  docker ps -aq -f status=exited | xargs -r docker rm >/dev/null 2>&1 || true
+
+  log_message "🧯 Removing non-running containers for repo: $IMAGE_REPO"
+  mapfile -t STALE_CONTAINERS < <(
+    docker ps -a \
+      --filter "ancestor=$IMAGE_REPO" \
+      --filter "status=created" \
+      --filter "status=exited" \
+      --filter "status=dead" \
+      --filter "status=paused" \
+      --format '{{.ID}}'
+  )
+  if ((${#STALE_CONTAINERS[@]})); then
+    printf '%s\n' "${STALE_CONTAINERS[@]}" | xargs -r docker rm -f >/dev/null 2>&1 || true
+    log_message "🧯 Removed ${#STALE_CONTAINERS[@]} non-running container(s) for $IMAGE_REPO"
+  else
+    log_message "ℹ️ No non-running containers for $IMAGE_REPO"
+  fi
+
+  log_message "🧽 Removing dangling images (if any)..."
+  docker images -f dangling=true -q | xargs -r docker rmi -f >/dev/null 2>&1 || true
+
+  USED_SERVICE_DIGESTS=()
   if [[ "$SWARM_ACTIVE" -eq 1 && "$SWARM_MANAGER" == "true" ]]; then
-    if image_used_by_service "$IMG_ID"; then
-      log_message "🔒 In use by Swarm service digest: $PRIMARY_TAG ($IMG_ID)"
+    mapfile -t USED_SERVICE_DIGESTS < <(
+      docker service ls --format '{{.ID}}' 2>/dev/null |
+      xargs -r -n1 docker service inspect --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null |
+      awk -F'@' 'NF==2{print $2}' |
+      sort -u
+    )
+    log_message "🔎 Found ${#USED_SERVICE_DIGESTS[@]} service image digest(s) in use."
+  else
+    log_message "🔎 Skipping service digest collection (not a manager)."
+  fi
+
+  log_message "🧾 Scanning local images for repo: $IMAGE_REPO"
+  mapfile -t IMAGE_ID_LIST < <(docker images "$IMAGE_REPO" --format '{{.ID}}' | sort -u)
+  log_message "🧾 Found ${#IMAGE_ID_LIST[@]} image ID(s) for repo: $IMAGE_REPO"
+
+  set +e
+  for IMG_ID in "${IMAGE_ID_LIST[@]:-}"; do
+    PRIMARY_TAG="$(get_primary_tag "$IMG_ID")"
+    RUNNING_CONTAINER_ID=$(docker ps --filter "ancestor=$IMG_ID" --format '{{.ID}}' | head -n1) || RUNNING_CONTAINER_ID=""
+    if [[ -n "$RUNNING_CONTAINER_ID" ]]; then
+      log_message "🔒 In use by RUNNING container: $PRIMARY_TAG ($IMG_ID)"
       continue
     fi
-  fi
 
-  # Otherwise delete it
-  log_message "➡️  Cleaning image: $PRIMARY_TAG ($IMG_ID)"
-  if remove_image_and_tags "$IMG_ID"; then
-    ((DELETED_IMAGE_COUNT++))
-  else
-    log_message "[⚠️] Skipped/failed: $PRIMARY_TAG ($IMG_ID)"
-  fi
-done
-# Restore errexit for anything after the loop
-set -e
+    if [[ "$SWARM_ACTIVE" -eq 1 && "$SWARM_MANAGER" == "true" ]]; then
+      if image_used_by_service "$IMG_ID"; then
+        log_message "🔒 In use by Swarm service digest: $PRIMARY_TAG ($IMG_ID)"
+        continue
+      fi
+    fi
 
-# Summary will be printed by the EXIT trap
-exit 0
+    log_message "➡️  Cleaning image: $PRIMARY_TAG ($IMG_ID)"
+    if remove_image_and_tags "$IMG_ID"; then
+      ((DELETED_IMAGE_COUNT++))
+    else
+      log_message "[⚠️] Skipped/failed: $PRIMARY_TAG ($IMG_ID)"
+    fi
+  done
+  set -e
+}
+
+main "$@"
