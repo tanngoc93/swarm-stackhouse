@@ -99,6 +99,10 @@ refresh_repo() {
   mv "$tmpdir/repo" "$TARGET_DIR"
   rmdir "$tmpdir" 2>/dev/null || true
 
+  # Ensure digests directory always exists (new or preserved)
+  mkdir -p "$TARGET_DIR/digests"
+  log "📂 Ensured digests directory exists."
+
   log "🏁 Repo ready at: $TARGET_DIR"
 }
 
@@ -151,6 +155,9 @@ main() {
       ensure_executable_if_exists "$TARGET_DIR/scripts/run_swarm_cleanup.sh"
       ensure_executable_if_exists "$TARGET_DIR/scripts/deploy_and_cleanup.sh"
       ensure_executable_if_exists "$TARGET_DIR/scripts/manual_rollback.sh"
+      # Ensure digests directory always exists when repo is up-to-date
+      mkdir -p "$TARGET_DIR/digests"
+      log "📂 Ensured digests directory exists."
     fi
   fi
 
