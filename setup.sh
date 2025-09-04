@@ -78,9 +78,9 @@ DESC
 
   # Replace defaults with user input (keeping ${VAR:-...} format)
   sed -i.bak \
-    -e "s|^IMAGE_REPO=.*|IMAGE_REPO=\\"\\${IMAGE_REPO:-$rep_repo}\\"|" \
-    -e "s|^STACK_NAME=.*|STACK_NAME=\\"\\${STACK_NAME:-$rep_name}\\"|" \
-    -e "s|^STACK_FILE=.*|STACK_FILE=\\"\\${STACK_FILE:-$rep_file}\\"|" \
+    -e "s|^IMAGE_REPO=.*|IMAGE_REPO=\"\\${IMAGE_REPO:-$rep_repo}\"|" \
+    -e "s|^STACK_NAME=.*|STACK_NAME=\"\\${STACK_NAME:-$rep_name}\"|" \
+    -e "s|^STACK_FILE=.*|STACK_FILE=\"\\${STACK_FILE:-$rep_file}\"|" \
     "$output"
   rm -f "$output.bak"
   chmod +x "$output"
