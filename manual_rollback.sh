@@ -37,7 +37,7 @@ main() {
   if [[ ! -f "$DIGEST_FILE" ]]; then
     {
       echo "Digest log not found: $DIGEST_FILE"
-      echo "Run deploy_and_cleanup.sh to generate it or set DIGEST_FILE to an existing log."
+      echo "Run scripts/deploy_and_cleanup.sh to generate it or set DIGEST_FILE to an existing log."
     } >&2
     exit 1
   fi

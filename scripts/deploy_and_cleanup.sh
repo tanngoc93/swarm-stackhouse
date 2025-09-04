@@ -10,10 +10,10 @@ set -euo pipefail
 #   STACK_FILE       Path to stack file (required)
 #   LOG_FILE         Output log (default: /var/log/deploy_${STACK_NAME}_uniq.log)
 #   LOCK_FILE        PID lock file (default: /tmp/deploy_${STACK_NAME}_uniq.pid)
-#   CLEANUP_SCRIPT      Script to run after deployment (default: ./scripts/run_swarm_cleanup.sh)
-#   CLEANUP_STACK_FILE  Stack file used by the cleanup script (default: ./docker/cleanup-stack.yml)
+#   CLEANUP_SCRIPT      Script to run after deployment (default: ./run_swarm_cleanup.sh)
+#   CLEANUP_STACK_FILE  Stack file used by the cleanup script (default: ../docker/cleanup-stack.yml)
 #   CLEANUP_STACK_NAME  Stack name used by the cleanup script (default: swarm-cleanup)
-#   DIGEST_DIR        Directory to store image digest logs (default: ./digests)
+#   DIGEST_DIR        Directory to store image digest logs (default: ../digests)
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$STACK_NAME|$IMAGE_TAG] $1"; }
 require() { command -v "$1" >/dev/null 2>&1 || { echo "command not found: $1" >&2; exit 1; }; }
@@ -26,10 +26,11 @@ main() {
   LOG_FILE="${LOG_FILE:-/var/log/deploy_${STACK_NAME}_uniq.log}"
   LOCK_FILE="${LOCK_FILE:-/tmp/deploy_${STACK_NAME}_uniq.pid}"
   SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-  CLEANUP_SCRIPT="${CLEANUP_SCRIPT:-$SCRIPT_DIR/scripts/run_swarm_cleanup.sh}"
-  CLEANUP_STACK_FILE="${CLEANUP_STACK_FILE:-$SCRIPT_DIR/docker/cleanup-stack.yml}"
+  REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
+  CLEANUP_SCRIPT="${CLEANUP_SCRIPT:-$SCRIPT_DIR/run_swarm_cleanup.sh}"
+  CLEANUP_STACK_FILE="${CLEANUP_STACK_FILE:-$REPO_ROOT/docker/cleanup-stack.yml}"
   CLEANUP_STACK_NAME="${CLEANUP_STACK_NAME:-swarm-cleanup}"
-  DIGEST_DIR="${DIGEST_DIR:-$SCRIPT_DIR/digests}"
+  DIGEST_DIR="${DIGEST_DIR:-$REPO_ROOT/digests}"
 
   if [[ -z "$IMAGE_REPO" || -z "$STACK_NAME" || -z "$STACK_FILE" ]]; then
     echo "IMAGE_REPO, STACK_NAME and STACK_FILE must be set" >&2
