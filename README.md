@@ -71,6 +71,9 @@ STACK_NAME=my_stack IMAGE_REPO=myorg/myimage ./scripts/manual_rollback.sh
 ```
 
 The script lists the most recent digests recorded for the stack and prompts for the one to roll back to.
+Digests are recorded during deployments by `deploy_and_cleanup.sh` and stored in
+`${STACK_NAME}_image_digests.log` at the repository root by default. If this file is missing,
+run the deploy script first or specify a custom path via `DIGEST_FILE`.
 
 ## Development
 
