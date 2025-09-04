@@ -29,10 +29,15 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
    export STACK_FILE=/path/to/stack.yml
    ```
 
+   Alternatively, you can specify these variables inline when running the deployment command.
+
 4. **Deploy the stack and clean up old images**
 
    ```bash
-   ./deploy_and_cleanup.sh
+   IMAGE_REPO=myorg/myimage \
+   STACK_NAME=my_stack \
+   STACK_FILE=/path/to/stack.yml \
+   bash ./deploy_and_cleanup.sh
    ```
 
    The script deploys or updates your stack, then removes unused images across the cluster.
