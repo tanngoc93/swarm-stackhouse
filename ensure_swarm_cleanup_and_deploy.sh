@@ -12,7 +12,8 @@
 #
 #   TARGET_DIR (optional) : destination directory (default: $HOME/run/swarm_cleanup)
 #   BRANCH     (optional) : git branch to track (default: main)
-#   ACTION     (optional) : deploy (default) or rollback
+#   ACTION     (optional) : deploy or rollback.
+#                        If omitted, a menu will prompt for the desired action.
 #
 # Environment variables (with sane defaults):
 #   IMAGE_TAG   : image tag to deploy (default: latest)
@@ -32,7 +33,7 @@ set -euo pipefail
 REPO_URL="https://github.com/tanngoc93/swarm_cleanup.git"
 TARGET_DIR="${1:-$HOME/run/swarm_cleanup}"
 BRANCH="${2:-main}"
-ACTION="${3:-deploy}"
+ACTION="${3:-}"
 
 # Deployment ENV (can be overridden by caller)
 IMAGE_TAG="${IMAGE_TAG:-latest}"
@@ -99,7 +100,7 @@ clone_fresh() {
   log "🏁 Repo ready at: $TARGET_DIR"
 }
 
-run_deploy() {
+run_deploy_and_cleanup() {
   # Execute deploy_and_cleanup.sh with the configured ENV
   local deploy_script="$TARGET_DIR/deploy_and_cleanup.sh"
   [[ -x "$deploy_script" ]] || abort "$deploy_script not found or not executable"
@@ -167,13 +168,34 @@ main() {
     fi
   fi
 
-  # 3) Run deployment or rollback
+  # 3) Determine action if not provided
+  if [[ -z "$ACTION" ]]; then
+    PS3="Select action: "
+    select choice in "Deploy and remove unused images" "Rollback"; do
+      case $REPLY in
+        1)
+          ACTION="deploy"
+          break
+          ;;
+        2)
+          ACTION="rollback"
+          break
+          ;;
+        *)
+          echo "Invalid option" >&2
+          ;;
+      esac
+    done
+    log "Chosen action: $ACTION"
+  fi
+
+  # 4) Run deployment or rollback
   case "$ACTION" in
     rollback)
       run_rollback
       ;;
     deploy)
-      run_deploy
+      run_deploy_and_cleanup
       ;;
     *)
       abort "Unknown action: $ACTION"
