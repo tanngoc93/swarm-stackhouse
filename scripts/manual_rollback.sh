@@ -4,21 +4,22 @@ set -euo pipefail
 # manual_rollback.sh - Roll back services in a Docker Swarm stack to a previously deployed image digest.
 #
 # Usage:
-#   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage ./manual_rollback.sh
-#   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage TARGET_DIGEST=sha256:deadbeef ./manual_rollback.sh
+#   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage ./scripts/manual_rollback.sh
+#   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage TARGET_DIGEST=sha256:deadbeef ./scripts/manual_rollback.sh
 #
 # Environment variables (with defaults):
 #   IMAGE_REPO    Image repository (default: myorg/myapp)
 #   STACK_NAME    Stack name (default: app_stack)
-#   DIGEST_DIR    Directory storing digest logs (default: ./digests)
-#   DIGEST_FILE   File storing digests (default: ./digests/app_stack_image_digests.log)
+#   DIGEST_DIR    Directory storing digest logs (default: ../digests)
+#   DIGEST_FILE   File storing digests (default: ../digests/app_stack_image_digests.log)
 #   TARGET_DIGEST Digest to roll back to (optional; prompts if unset)
 
 # -------- Config (defaults) --------
 IMAGE_REPO="${IMAGE_REPO:-myorg/myapp}"
 STACK_NAME="${STACK_NAME:-app_stack}"
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-DIGEST_DIR="${DIGEST_DIR:-$SCRIPT_DIR/digests}"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
+DIGEST_DIR="${DIGEST_DIR:-$REPO_ROOT/digests}"
 DIGEST_FILE="${DIGEST_FILE:-$DIGEST_DIR/${STACK_NAME}_image_digests.log}"
 TARGET_DIGEST="${TARGET_DIGEST:-}"
 LOG_TAG="rollback"

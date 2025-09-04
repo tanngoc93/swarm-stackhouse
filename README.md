@@ -26,7 +26,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
    To roll back manually, create another script (e.g. `rollback_swarm.sh`) containing:
 
    ```bash
-   IMAGE_REPO=myorg/myapp STACK_NAME=app_stack bash /tmp/swarm-stackhouse/manual_rollback.sh
+   IMAGE_REPO=myorg/myapp STACK_NAME=app_stack bash /tmp/swarm-stackhouse/scripts/manual_rollback.sh
    ```
 
    Make it executable with `chmod +x rollback_swarm.sh`.
@@ -52,7 +52,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 Run basic syntax checks before submitting changes:
 
 ```bash
-bash -n scripts/*.sh manual_rollback.sh ensure_swarm_stackhouse_and_deploy.sh
+bash -n scripts/*.sh ensure_swarm_stackhouse_and_deploy.sh
 ```
 
 ## License
