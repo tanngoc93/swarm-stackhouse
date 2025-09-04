@@ -84,6 +84,12 @@ refresh_repo() {
   ensure_executable_if_exists "$tmpdir/repo/scripts/deploy_and_cleanup.sh"
   ensure_executable_if_exists "$tmpdir/repo/scripts/manual_rollback.sh"
 
+  # Preserve existing digest logs (if any)
+  if [[ -d "$TARGET_DIR/digests" ]]; then
+    cp -r "$TARGET_DIR/digests" "$tmpdir/repo/" 2>/dev/null || true
+    log "🗃️  Preserved existing digests directory."
+  fi
+
   # Atomic replace of the target directory
   mkdir -p "$(dirname "$TARGET_DIR")"
   if [[ -e "$TARGET_DIR" ]]; then
