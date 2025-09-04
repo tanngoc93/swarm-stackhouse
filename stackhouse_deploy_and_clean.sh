@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ensure_swarm_stackhouse_and_deploy.sh
+# stackhouse_deploy_and_clean.sh
 #
 # Purpose:
 #   - Ensure the public repo "swarm-stackhouse" exists locally (HTTPS clone).
@@ -7,7 +7,7 @@
 #   - Run the repo's ./scripts/deploy_and_cleanup.sh with the provided ENV configuration.
 #
 # Usage:
-#   ./ensure_swarm_stackhouse_and_deploy.sh [TARGET_DIR] [BRANCH]
+#   ./stackhouse_deploy_and_clean.sh [TARGET_DIR] [BRANCH]
 #
 #   TARGET_DIR (optional) : destination directory (default: /tmp/swarm-stackhouse)
 #   BRANCH     (optional) : git branch to track (default: main)

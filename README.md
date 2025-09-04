@@ -6,7 +6,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 
 1. **Create a deployment script**
 
-   On the Swarm manager node, create a shell script such as `deploy_swarm.sh` and copy the contents of `ensure_swarm_stackhouse_and_deploy.sh` from this repository into it. Make the script executable:
+   On the Swarm manager node, create a shell script such as `deploy_swarm.sh` and copy the contents of `stackhouse_deploy_and_clean.sh` from this repository into it. Make the script executable:
 
    ```bash
    chmod +x deploy_swarm.sh
@@ -52,7 +52,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 Run basic syntax checks before submitting changes:
 
 ```bash
-bash -n scripts/*.sh ensure_swarm_stackhouse_and_deploy.sh
+bash -n scripts/*.sh stackhouse_deploy_and_clean.sh
 ```
 
 ## License
