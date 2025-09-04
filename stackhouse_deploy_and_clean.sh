@@ -87,7 +87,7 @@ refresh_repo() {
   # Preserve existing digest logs (if any)
   if [[ -d "$TARGET_DIR/digests" ]]; then
     cp -r "$TARGET_DIR/digests" "$tmpdir/repo/" 2>/dev/null || true
-    log "🗃️  Preserved existing digests directory."
+    log "🗃️ Preserved existing digests directory."
   fi
 
   # Atomic replace of the target directory
