@@ -60,62 +60,77 @@ main() {
     log "📦 Using image: $IMAGE_REPO:$IMAGE_TAG"
     log "📄 Stack file: $STACK_FILE"
 
-    image_ref="$IMAGE_REPO:$IMAGE_TAG"
-    log "📥 Pulling image: $image_ref"
-    if ! docker pull "$image_ref" >/dev/null 2>&1; then
-      log "[❌] Failed to pull image: $image_ref"
-      exit 1
+    skip_deploy=false
+    existing_service=$(docker stack services "$STACK_NAME" --format '{{.Name}}' 2>/dev/null | head -n1 || true)
+    if [[ "$IMAGE_TAG" != "latest" && -n "$existing_service" ]]; then
+      current_image=$(docker service inspect "$existing_service" -f '{{index .Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null || true)
+      current_tag=$(echo "$current_image" | sed -e 's/@.*//' | awk -F':' '{print $NF}')
+      if [[ "$current_tag" == "$IMAGE_TAG" ]]; then
+        log "♻️ Stack already running image tag $IMAGE_TAG. Skipping deploy/update."
+        skip_deploy=true
+      fi
     fi
 
-    if [[ "$IMAGE_TAG" == "latest" ]]; then
-      log "🔍 Resolving digest for latest tag..."
-      image_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image_ref" 2>/dev/null || true)
-      if [[ -z "$image_digest" ]]; then
-        log "[❌] Failed to resolve digest for $image_ref"
+    if ! $skip_deploy; then
+      image_ref="$IMAGE_REPO:$IMAGE_TAG"
+      log "📥 Pulling image: $image_ref"
+      if ! docker pull "$image_ref" >/dev/null 2>&1; then
+        log "[❌] Failed to pull image: $image_ref"
         exit 1
       fi
-      image_ref="$image_digest"
-      log "✅ Using digest: $image_ref"
-    else
-      log "✅ Using specific tag: $image_ref"
-    fi
 
-    update_services=true
-    if [[ -z $(docker stack services "$STACK_NAME" --format '{{.Name}}') ]]; then
-      log "⚙️ Stack '$STACK_NAME' is missing. Deploying from scratch..."
-      if ! IMAGE_NAME="$image_ref" docker stack deploy -c "$STACK_FILE" --with-registry-auth "$STACK_NAME" >/dev/null 2>&1; then
-        log "[❌] Failed to deploy stack: $STACK_NAME"
-        exit 1
-      fi
-      log "✅ Stack deployed successfully."
-      update_services=false
-    else
-      log "✅ Stack is running. Proceeding to update services..."
-    fi
-
-    stack_services=($(docker stack services "$STACK_NAME" --format '{{.Name}}'))
-
-    if $update_services; then
-      for service_name in "${stack_services[@]}"; do
-        if ! docker service inspect "$service_name" >/dev/null 2>&1; then
-          log "[⚠️] Skipping not found service: $service_name"
-          continue
-        fi
-        log "🔄 Updating service: $service_name"
-        if docker service update --image "$image_ref" --force "$service_name" >/dev/null 2>&1; then
-          log "✅ Done updating: $service_name"
-        else
-          log "[❌] Failed to update: $service_name"
+      if [[ "$IMAGE_TAG" == "latest" ]]; then
+        log "🔍 Resolving digest for latest tag..."
+        image_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image_ref" 2>/dev/null || true)
+        if [[ -z "$image_digest" ]]; then
+          log "[❌] Failed to resolve digest for $image_ref"
           exit 1
         fi
-      done
-      log "✅ All services updated with image: $image_ref"
-    else
-      log "ℹ️ Skipped update — stack was just deployed."
-    fi
+        image_ref="$image_digest"
+        log "✅ Using digest: $image_ref"
+      else
+        log "✅ Using specific tag: $image_ref"
+      fi
 
-    deploy_duration=$(( $(date +%s) - START_TS ))
-    log "🏁 Deploy completed in ${deploy_duration}s"
+      update_services=true
+      if [[ -z $(docker stack services "$STACK_NAME" --format '{{.Name}}') ]]; then
+        log "⚙️ Stack '$STACK_NAME' is missing. Deploying from scratch..."
+        if ! IMAGE_NAME="$image_ref" docker stack deploy -c "$STACK_FILE" --with-registry-auth "$STACK_NAME" >/dev/null 2>&1; then
+          log "[❌] Failed to deploy stack: $STACK_NAME"
+          exit 1
+        fi
+        log "✅ Stack deployed successfully."
+        update_services=false
+      else
+        log "✅ Stack is running. Proceeding to update services..."
+      fi
+
+      stack_services=($(docker stack services "$STACK_NAME" --format '{{.Name}}'))
+
+      if $update_services; then
+        for service_name in "${stack_services[@]}"; do
+          if ! docker service inspect "$service_name" >/dev/null 2>&1; then
+            log "[⚠️] Skipping not found service: $service_name"
+            continue
+          fi
+          log "🔄 Updating service: $service_name"
+          if docker service update --image "$image_ref" --force "$service_name" >/dev/null 2>&1; then
+            log "✅ Done updating: $service_name"
+          else
+            log "[❌] Failed to update: $service_name"
+            exit 1
+          fi
+        done
+        log "✅ All services updated with image: $image_ref"
+      else
+        log "ℹ️ Skipped update — stack was just deployed."
+      fi
+
+      deploy_duration=$(( $(date +%s) - START_TS ))
+      log "🏁 Deploy completed in ${deploy_duration}s"
+    else
+      log "🏁 No deployment needed."
+    fi
 
     if [[ -f "$CLEANUP_SCRIPT" && -x "$CLEANUP_SCRIPT" ]]; then
       log "⏳ Waiting 30s before cleanup..."
