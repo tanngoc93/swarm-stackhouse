@@ -31,8 +31,9 @@ Collection of Bash utilities to deploy Docker Swarm stacks, clean up old images,
 ## Sample stack file
 
 An example Docker Swarm stack configuration is provided in `swarm-stack-sample/sample-stack.yml`.
-Use it as a starting point and replace placeholder values like `exampleorg/myapp:latest`
-and `example.com` with settings for your environment.
+The `image` field supports overriding via an `IMAGE_NAME` environment variable and falls back to
+`exampleorg/myapp:latest` if none is provided. Replace this placeholder along with `example.com`
+and other sample values with settings for your environment.
 
 ## Logs and debugging
 

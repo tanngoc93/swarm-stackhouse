@@ -5,7 +5,7 @@ networks:
 
 services:
   web:
-    image: "exampleorg/myapp:latest"
+    image: "${IMAGE_NAME:-exampleorg/myapp:latest}"
     working_dir: /app
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
