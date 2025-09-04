@@ -2,75 +2,50 @@
 
 Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused images.
 
+## Step-by-Step Setup
+
+1. **Create a deployment script**
+
+   On the Swarm manager node, create a shell script such as `deploy_swarm.sh` and copy the contents of `ensure_swarm_cleanup_and_deploy.sh` from this repository into it. Make the script executable:
+
+   ```bash
+   chmod +x deploy_swarm.sh
+   ```
+
+2. **Configure required environment variables**
+
+   The deployment script uses the following variables. Export them or specify them inline when running:
+
+   - `IMAGE_TAG` – image tag to deploy (default: `latest`)
+   - `IMAGE_REPO` – image repo (default: `myorg/myapp`)
+   - `STACK_NAME` – stack name (default: `app_stack`)
+   - `STACK_FILE` – stack file path (default: `/root/docker/app-stack.yml`)
+
+3. **Optional: create a manual rollback script**
+
+   To roll back manually, create another script (e.g. `rollback_swarm.sh`) containing:
+
+   ```bash
+   IMAGE_REPO=myorg/myapp STACK_NAME=app_stack bash /tmp/swarm_cleanup/manual_rollback.sh
+   ```
+
+   Make it executable with `chmod +x rollback_swarm.sh`.
+
+4. **Run the deployment**
+
+   After everything is set up, run the deployment from the terminal:
+
+   ```bash
+   IMAGE_TAG=v1 ./deploy_swarm.sh
+   ```
+
+   The script clones or updates this repository at `/tmp/swarm_cleanup`, deploys the specified stack, and removes unused images across the cluster.
+
 ## Requirements
 
 - Bash
 - Docker CLI available in your `PATH`
 - Access to a Docker daemon in Swarm mode
-
-## Quick Start
-
-1. **Clone the repo**
-
-   ```bash
-   git clone https://github.com/your-org/swarm_cleanup.git
-   cd swarm_cleanup
-   ```
-
-2. **Prepare your stack file**
-
-   Use an existing Docker Compose file or create one for the services you want to run.
-
-3. **Set environment variables**
-
-   ```bash
-   export IMAGE_REPO=myorg/myimage
-   export STACK_NAME=my_stack
-   export STACK_FILE=/path/to/stack.yml
-   ```
-
-   Alternatively, you can specify these variables inline when running the deployment command.
-
-4. **Deploy the stack and clean up old images**
-
-   ```bash
-   IMAGE_REPO=myorg/myimage \
-   STACK_NAME=my_stack \
-   STACK_FILE=/path/to/stack.yml \
-   bash ./deploy_and_cleanup.sh
-   ```
-
-   The script deploys or updates your stack, then removes unused images across the cluster.
-
-## Additional Scripts
-
-- **Clean images on the current node**
-  ```bash
-  IMAGE_REPO=myorg/myimage ./scripts/cleanup_docker_images.sh
-  ```
-  Set `DRY_RUN=1` to preview deletions.
-
-- **Run cleanup on every Swarm node**
-  ```bash
-  IMAGE_REPO=myorg/myimage ./scripts/run_swarm_cleanup.sh
-  ```
-  Optional variables:
-  - `STACK_FILE` path to stack file (default `docker/cleanup-stack.yml`)
-  - `STACK_NAME` name for the temporary stack (default `swarm-cleanup`)
-
- - **Roll back to a previous image digest**
-   ```bash
-   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage ./manual_rollback.sh
-   ```
-
-- **Ensure repo and deploy**
-  Clone or update this repo and run `deploy_and_cleanup.sh` in one step:
-  ```bash
-  IMAGE_REPO=myorg/myimage \
-  STACK_NAME=my_stack \
-  STACK_FILE=/root/docker/app-stack.yml \
-  ./ensure_swarm_cleanup_and_deploy.sh /tmp/swarm_cleanup main
-  ```
 
 ## Development
 
