@@ -1,4 +1,4 @@
-# Swarm Cleanup
+# Swarm Stackhouse
 
 Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused images.
 
