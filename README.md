@@ -6,7 +6,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 
 1. **Create a deployment script**
 
-   On the Swarm manager node, create a shell script such as `deploy_swarm.sh` and copy the contents of `ensure_swarm_cleanup_and_deploy.sh` from this repository into it. Make the script executable:
+   On the Swarm manager node, create a shell script such as `deploy_swarm.sh` and copy the contents of `ensure_swarm_stackhouse_and_deploy.sh` from this repository into it. Make the script executable:
 
    ```bash
    chmod +x deploy_swarm.sh
@@ -26,7 +26,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
    To roll back manually, create another script (e.g. `rollback_swarm.sh`) containing:
 
    ```bash
-   IMAGE_REPO=myorg/myapp STACK_NAME=app_stack bash /tmp/swarm_cleanup/manual_rollback.sh
+   IMAGE_REPO=myorg/myapp STACK_NAME=app_stack bash /tmp/swarm-stackhouse/manual_rollback.sh
    ```
 
    Make it executable with `chmod +x rollback_swarm.sh`.
@@ -39,7 +39,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
    IMAGE_TAG=v1 ./deploy_swarm.sh
    ```
 
-   The script clones or updates this repository at `/tmp/swarm_cleanup`, deploys the specified stack, and removes unused images across the cluster.
+   The script clones or updates this repository at `/tmp/swarm-stackhouse`, deploys the specified stack, and removes unused images across the cluster.
 
 ## Requirements
 
@@ -52,7 +52,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 Run basic syntax checks before submitting changes:
 
 ```bash
-bash -n deploy_and_cleanup.sh manual_rollback.sh scripts/*.sh ensure_swarm_cleanup_and_deploy.sh
+bash -n deploy_and_cleanup.sh manual_rollback.sh scripts/*.sh ensure_swarm_stackhouse_and_deploy.sh
 ```
 
 ## License

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# ensure_swarm_cleanup_and_deploy.sh
+# ensure_swarm_stackhouse_and_deploy.sh
 #
 # Purpose:
-#   - Ensure the public repo "swarm_cleanup" exists locally (HTTPS clone).
+#   - Ensure the public repo "swarm-stackhouse" exists locally (HTTPS clone).
 #   - If the remote branch has a newer commit, re-clone a fresh copy (atomic replace).
 #   - Run the repo's ./deploy_and_cleanup.sh with the provided ENV configuration.
 #
 # Usage:
-#   ./ensure_swarm_cleanup_and_deploy.sh [TARGET_DIR] [BRANCH]
+#   ./ensure_swarm_stackhouse_and_deploy.sh [TARGET_DIR] [BRANCH]
 #
-#   TARGET_DIR (optional) : destination directory (default: /tmp/swarm_cleanup)
+#   TARGET_DIR (optional) : destination directory (default: /tmp/swarm-stackhouse)
 #   BRANCH     (optional) : git branch to track (default: main)
 #
 # Environment variables (with sane defaults):
@@ -26,8 +26,8 @@
 set -euo pipefail
 
 # -------- Config (defaults) --------
-REPO_URL="https://github.com/tanngoc93/swarm_cleanup.git"
-TARGET_DIR="${1:-/tmp/swarm_cleanup}"
+REPO_URL="https://github.com/tanngoc93/swarm-stackhouse.git"
+TARGET_DIR="${1:-/tmp/swarm-stackhouse}"
 BRANCH="${2:-main}"
 
 # Deployment ENV (can be overridden by caller)
