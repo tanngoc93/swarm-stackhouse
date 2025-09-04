@@ -32,6 +32,8 @@ BRANCH="${2:-main}"
 
 # Deployment ENV (can be overridden by caller)
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+# The following defaults may be overridden by setup.sh when generating
+# a customized deployment script.
 IMAGE_REPO="${IMAGE_REPO:-myorg/myapp}"
 STACK_NAME="${STACK_NAME:-app_stack}"
 STACK_FILE="${STACK_FILE:-/root/docker/app-stack.yml}"
