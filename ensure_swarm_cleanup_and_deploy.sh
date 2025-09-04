@@ -5,18 +5,21 @@
 #   - Ensure the public repo "swarm_cleanup" exists locally (HTTPS clone).
 #   - If the remote branch has a newer commit, re-clone a fresh copy (atomic replace).
 #   - Run the repo's ./deploy_and_cleanup.sh with the provided ENV configuration.
+#   - Or run ./scripts/manual_rollback.sh when rollback is requested.
 #
 # Usage:
-#   ./ensure_swarm_cleanup_and_deploy.sh [TARGET_DIR] [BRANCH]
+#   ./ensure_swarm_cleanup_and_deploy.sh [TARGET_DIR] [BRANCH] [ACTION]
 #
 #   TARGET_DIR (optional) : destination directory (default: $HOME/run/swarm_cleanup)
 #   BRANCH     (optional) : git branch to track (default: main)
+#   ACTION     (optional) : deploy (default) or rollback
 #
 # Environment variables (with sane defaults):
 #   IMAGE_TAG   : image tag to deploy (default: latest)
 #   IMAGE_REPO  : image repo (default: myorg/myapp)
 #   STACK_NAME  : stack name (default: app_stack)
-#   STACK_FILE  : stack file path (default: /root/docker/app-stack.yml)
+#   STACK_FILE   : stack file path (default: /root/docker/app-stack.yml)
+#   TARGET_DIGEST: image digest for rollback (optional)
 #
 # Notes:
 #   - Designed to be idempotent and safe to re-run.
@@ -29,12 +32,14 @@ set -euo pipefail
 REPO_URL="https://github.com/tanngoc93/swarm_cleanup.git"
 TARGET_DIR="${1:-$HOME/run/swarm_cleanup}"
 BRANCH="${2:-main}"
+ACTION="${3:-deploy}"
 
 # Deployment ENV (can be overridden by caller)
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 IMAGE_REPO="${IMAGE_REPO:-myorg/myapp}"
 STACK_NAME="${STACK_NAME:-app_stack}"
 STACK_FILE="${STACK_FILE:-/root/docker/app-stack.yml}"
+TARGET_DIGEST="${TARGET_DIGEST:-}"
 
 # -------- Utilities --------
 log() { printf "[%s] %s\n" "$(date '+%F %T')" "$*"; }
@@ -80,6 +85,7 @@ clone_fresh() {
   # Make commonly used scripts executable (idempotent)
   ensure_executable_if_exists "$tmpdir/repo/scripts/run_swarm_cleanup.sh"
   ensure_executable_if_exists "$tmpdir/repo/deploy_and_cleanup.sh"
+  ensure_executable_if_exists "$tmpdir/repo/scripts/manual_rollback.sh"
 
   # Atomic replace
   mkdir -p "$(dirname "$TARGET_DIR")"
@@ -109,6 +115,22 @@ run_deploy() {
   STACK_NAME="$STACK_NAME" \
   STACK_FILE="$STACK_FILE" \
   "$deploy_script"
+}
+
+run_rollback() {
+  # Execute manual_rollback.sh with the configured ENV
+  local rollback_script="$TARGET_DIR/scripts/manual_rollback.sh"
+  [[ -x "$rollback_script" ]] || abort "$rollback_script not found or not executable"
+
+  log "↩️  Running manual_rollback.sh with ENV:"
+  log "    IMAGE_REPO   = $IMAGE_REPO"
+  log "    STACK_NAME  = $STACK_NAME"
+  log "    TARGET_DIGEST = ${TARGET_DIGEST:-<prompt>}"
+
+  IMAGE_REPO="$IMAGE_REPO" \
+  STACK_NAME="$STACK_NAME" \
+  TARGET_DIGEST="$TARGET_DIGEST" \
+  "$rollback_script"
 }
 
 # -------- Main flow --------
@@ -141,11 +163,22 @@ main() {
       # Still ensure scripts are executable (idempotent)
       ensure_executable_if_exists "$TARGET_DIR/scripts/run_swarm_cleanup.sh"
       ensure_executable_if_exists "$TARGET_DIR/deploy_and_cleanup.sh"
+      ensure_executable_if_exists "$TARGET_DIR/scripts/manual_rollback.sh"
     fi
   fi
 
-  # 3) Run deployment
-  run_deploy
+  # 3) Run deployment or rollback
+  case "$ACTION" in
+    rollback)
+      run_rollback
+      ;;
+    deploy)
+      run_deploy
+      ;;
+    *)
+      abort "Unknown action: $ACTION"
+      ;;
+  esac
 }
 
 main "$@"
