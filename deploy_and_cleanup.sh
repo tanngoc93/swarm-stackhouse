@@ -122,7 +122,7 @@ fi
   log_message "🏁 Deploy completed in ${DEPLOY_DURATION}s"
 
   # Ensure cleanup script is executable
-  if [[ -f "$CLEANUP_SCRIPT" && ! -x "$CLEANUP_SCRIPT" ]]; then
+  if [[ -f "$CLEANUP_SCRIPT" && -x "$CLEANUP_SCRIPT" ]]; then
     log_message "⏳ Waiting 30s before cleanup..."
     sleep 30
     log_message "🧹 Running swarm image cleanup..."
