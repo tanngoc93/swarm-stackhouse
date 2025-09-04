@@ -1,43 +1,75 @@
 # Swarm Stackhouse
 
-Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused images.
+Bash utilities for deploying Docker Swarm stacks, cleaning old images and
+rolling back by digest.
 
-## Step-by-Step Setup
+## Quick start
 
 1. **Generate a deployment script**
 
-   Run `./setup.sh` and provide:
-
-   - `IMAGE_REPO` – container image repository
-   - `STACK_NAME` – stack name
-   - `STACK_FILE` – path to the stack file
-
-   A script named `deploy_<STACK_NAME>_<timestamp>.sh` will be created in the current directory with these values embedded.
-
-2. **Optional: create a manual rollback script**
-
-   To roll back manually, create another script (e.g. `rollback_swarm.sh`) containing:
+   Run the setup script directly from the internet and answer the prompts:
 
    ```bash
-   IMAGE_REPO=myorg/myapp STACK_NAME=app_stack bash /tmp/swarm-stackhouse/scripts/manual_rollback.sh
+   curl -fsSL https://raw.githubusercontent.com/tanngoc93/swarm-stackhouse/main/setup.sh | bash
    ```
 
-   Make it executable with `chmod +x rollback_swarm.sh`.
+   A file named `deploy_<STACK_NAME>_<timestamp>.sh` will be created in the
+   current directory with your values baked in.
 
-3. **Run the deployment**
+2. **Deploy**
 
-   After everything is set up, run the deployment from the terminal:
+   Execute the generated script to deploy or update your stack. Optionally
+   override the image tag at runtime (defaults to `latest`):
 
    ```bash
    IMAGE_TAG=v1 ./deploy_<STACK_NAME>_<timestamp>.sh
    ```
 
-   The script clones or updates this repository at `/tmp/swarm-stackhouse`, deploys the specified stack, and removes unused images across the cluster. You can override the `IMAGE_TAG` environment variable when running the script (default: `latest`).
+## Logs and debugging
+
+* Logs are written to `/var/log/deploy_<STACK_NAME>_uniq.log` by default.
+  View them with:
+
+  ```bash
+  tail -f /var/log/deploy_<STACK_NAME>_uniq.log
+  ```
+
+* For verbose debugging output, run the deployment script with `bash -x`:
+
+  ```bash
+  IMAGE_TAG=v1 bash -x ./deploy_<STACK_NAME>_<timestamp>.sh
+  ```
+
+## Manual rollback
+
+The repository provides `scripts/manual_rollback.sh` to roll back services to a
+previously deployed image digest. Run it like this:
+
+```bash
+STACK_NAME=my_stack IMAGE_REPO=myorg/myimage \
+  bash /tmp/swarm-stackhouse/scripts/manual_rollback.sh
+```
+
+You will be prompted to select a stored digest. Set `TARGET_DIGEST` to skip the
+prompt.
+
+You may create a convenience wrapper (e.g. `rollback_swarm.sh`) containing the
+above command and make it executable with `chmod +x rollback_swarm.sh`.
+
+## Running rollback
+
+To roll back using a specific digest:
+
+```bash
+STACK_NAME=my_stack IMAGE_REPO=myorg/myimage \
+  TARGET_DIGEST=sha256:deadbeef \
+  bash /tmp/swarm-stackhouse/scripts/manual_rollback.sh
+```
 
 ## Requirements
 
 - Bash
-- Docker CLI available in your `PATH`
+- Docker CLI available in `PATH`
 - Access to a Docker daemon in Swarm mode
 
 ## Development
@@ -51,3 +83,4 @@ bash -n scripts/*.sh stackhouse_deploy_and_clean.sh setup.sh
 ## License
 
 This project is provided under the MIT License.
+
