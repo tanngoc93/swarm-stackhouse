@@ -28,6 +28,13 @@ Collection of Bash utilities to deploy Docker Swarm stacks, clean up old images,
    IMAGE_TAG=v1 ./deploy_<STACK_NAME>_<timestamp>.sh
    ```
 
+## Sample stack file
+
+An example Docker Swarm stack configuration is provided in `swarm-stack-sample/sample-stack.yml`.
+The `image` field supports overriding via an `IMAGE_NAME` environment variable and falls back to
+`exampleorg/myapp:latest` if none is provided. Replace this placeholder along with `example.com`
+and other sample values with settings for your environment.
+
 ## Logs and debugging
 
 * Logs are written to `log/deploy_<STACK_NAME>_uniq.log` in the repository root. Tail them with:
