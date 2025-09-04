@@ -10,7 +10,7 @@ rolling back by digest.
    Run the setup script directly from the internet and answer the prompts:
 
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/tanngoc93/swarm-stackhouse/main/setup.sh | bash
+   bash <(curl -fsSL https://raw.githubusercontent.com/tanngoc93/swarm-stackhouse/main/setup.sh)
    ```
 
    A file named `deploy_<STACK_NAME>_<timestamp>.sh` will be created in the
