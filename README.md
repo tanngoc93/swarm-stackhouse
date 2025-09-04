@@ -4,24 +4,17 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 
 ## Step-by-Step Setup
 
-1. **Create a deployment script**
+1. **Generate a deployment script**
 
-   On the Swarm manager node, create a shell script such as `deploy_swarm.sh` and copy the contents of `stackhouse_deploy_and_clean.sh` from this repository into it. Make the script executable:
+   Run `./setup.sh` and provide:
 
-   ```bash
-   chmod +x deploy_swarm.sh
-   ```
+   - `IMAGE_REPO` – container image repository
+   - `STACK_NAME` – stack name
+   - `STACK_FILE` – path to the stack file
 
-2. **Configure required environment variables**
+   A script named `deploy_<STACK_NAME>_<timestamp>.sh` will be created in the current directory with these values embedded.
 
-   The deployment script uses the following variables. Export them or specify them inline when running:
-
-   - `IMAGE_TAG` – image tag to deploy (default: `latest`)
-   - `IMAGE_REPO` – image repo (default: `myorg/myapp`)
-   - `STACK_NAME` – stack name (default: `app_stack`)
-   - `STACK_FILE` – stack file path (default: `/root/docker/app-stack.yml`)
-
-3. **Optional: create a manual rollback script**
+2. **Optional: create a manual rollback script**
 
    To roll back manually, create another script (e.g. `rollback_swarm.sh`) containing:
 
@@ -31,15 +24,15 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 
    Make it executable with `chmod +x rollback_swarm.sh`.
 
-4. **Run the deployment**
+3. **Run the deployment**
 
    After everything is set up, run the deployment from the terminal:
 
    ```bash
-   IMAGE_TAG=v1 ./deploy_swarm.sh
+   IMAGE_TAG=v1 ./deploy_<STACK_NAME>_<timestamp>.sh
    ```
 
-   The script clones or updates this repository at `/tmp/swarm-stackhouse`, deploys the specified stack, and removes unused images across the cluster.
+   The script clones or updates this repository at `/tmp/swarm-stackhouse`, deploys the specified stack, and removes unused images across the cluster. You can override the `IMAGE_TAG` environment variable when running the script (default: `latest`).
 
 ## Requirements
 
@@ -52,7 +45,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 Run basic syntax checks before submitting changes:
 
 ```bash
-bash -n scripts/*.sh stackhouse_deploy_and_clean.sh
+bash -n scripts/*.sh stackhouse_deploy_and_clean.sh setup.sh
 ```
 
 ## License
