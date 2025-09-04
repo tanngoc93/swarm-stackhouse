@@ -53,10 +53,14 @@ main() {
     for i in "${!DIGESTS[@]}"; do
       echo "$((i+1))) ${DIGESTS[$i]}"
     done
-    read -p "Select digest number: " sel
+    read -p "Select digest number (0 to exit): " sel
     if [[ -z "$sel" || ! "$sel" =~ ^[0-9]+$ ]]; then
       echo "Invalid selection" >&2
       exit 1
+    fi
+    if [[ "$sel" -eq 0 ]]; then
+      echo "Exiting without rollback."
+      exit 0
     fi
     idx=$((sel-1))
     if (( idx < 0 || idx >= ${#DIGESTS[@]} )); then
@@ -91,3 +95,5 @@ main() {
 }
 
 main "$@"
+
+exit 0
