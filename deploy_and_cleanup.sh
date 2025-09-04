@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # deploy_and_cleanup.sh - Deploy or update a Docker Swarm stack and remove old images.
 #
