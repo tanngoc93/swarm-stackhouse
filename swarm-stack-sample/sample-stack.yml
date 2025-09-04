@@ -1,0 +1,61 @@
+networks:
+  public-network:
+    driver: overlay
+    external: true
+
+services:
+  web:
+    image: "exampleorg/myapp:latest"
+    working_dir: /app
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    environment:
+      DB_POOL: "5"
+      DB_HOST: "db.example"
+      DB_PORT: "5432"
+      DB_USER: "demo"
+      DB_PASSWORD: "secret"
+      DB_PRODUCTION: "false"
+      REDIS_URL: "redis://redis.example:6379/0"
+      REDIS_CACHE_URL: "redis://redis.example:6379/1"
+      RAILS_ENV: "production"
+      PORT: "3000"
+    command: /bin/sh "/app/start.sh"
+    deploy:
+      mode: replicated
+      replicas: 2
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=public-network"
+        # Middleware: redirect
+        - "traefik.http.middlewares.web-redirect.redirectscheme.scheme=https"
+        # HTTP Router
+        - "traefik.http.routers.web-http.rule=Host(`example.com`)"
+        - "traefik.http.routers.web-http.entrypoints=web"
+        - "traefik.http.routers.web-http.middlewares=web-redirect"
+        - "traefik.http.routers.web-http.service=web-svc"
+        # HTTPS Router
+        - "traefik.http.routers.web-secured.rule=Host(`example.com`)"
+        - "traefik.http.routers.web-secured.entrypoints=websecured"
+        - "traefik.http.routers.web-secured.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.web-secured.service=web-svc"
+        # Service port
+        - "traefik.http.services.web-svc.loadbalancer.server.port=3000"
+      update_config:
+        parallelism: 2
+        delay: 10s
+        failure_action: rollback
+        monitor: 10s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    stop_grace_period: 10s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - public-network
