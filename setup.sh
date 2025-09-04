@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 cat <<'DESC'
 =====================================================================
 Stackhouse deploy setup
@@ -44,10 +46,10 @@ rep_file=$(escape_sed "$STACK_FILE")
 timestamp=$(date +%s)
 output="deploy_${STACK_NAME}_${timestamp}.sh"
 
-cp stackhouse_deploy_and_clean.sh "$output"
-sed -i "s|IMAGE_REPO=\"\\\${IMAGE_REPO:-myorg/myapp}\"|IMAGE_REPO=\"$rep_repo\"|" "$output"
-sed -i "s|STACK_NAME=\"\\\${STACK_NAME:-app_stack}\"|STACK_NAME=\"$rep_name\"|" "$output"
-sed -i "s|STACK_FILE=\"\\\${STACK_FILE:-/root/docker/app-stack.yml}\"|STACK_FILE=\"$rep_file\"|" "$output"
+cp "$SCRIPT_DIR/stackhouse_deploy_and_clean.sh" "$output"
+sed -i "s|^IMAGE_REPO=.*$|IMAGE_REPO=\"$rep_repo\"|" "$output"
+sed -i "s|^STACK_NAME=.*$|STACK_NAME=\"$rep_name\"|" "$output"
+sed -i "s|^STACK_FILE=.*$|STACK_FILE=\"$rep_file\"|" "$output"
 chmod +x "$output"
 
 echo "\n✅ Created deployment script: $output"
