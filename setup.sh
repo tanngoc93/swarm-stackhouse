@@ -3,14 +3,12 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 cat <<'DESC'
 =====================================================================
 Stackhouse deploy setup
 ---------------------------------------------------------------------
-This utility generates a custom deployment script based on
-stackhouse_deploy_and_clean.sh. You'll be prompted for:
+This utility generates a custom deployment script based on the latest
+stackhouse_deploy_and_clean.sh from GitHub. You'll be prompted for:
   - IMAGE_REPO : container image repository
   - STACK_NAME : name of the Swarm stack
   - STACK_FILE : path to the stack YAML file
@@ -47,9 +45,15 @@ rep_file=$(escape_sed "$STACK_FILE")
 timestamp=$(date +%s)
 output="deploy_${STACK_NAME}_${timestamp}.sh"
 
-cp stackhouse_deploy_and_clean.sh "$output"
+echo "⬇️  Fetching latest stackhouse_deploy_and_clean.sh from GitHub..."
+curl -fsSL \
+  https://raw.githubusercontent.com/tanngoc93/swarm-stackhouse/main/stackhouse_deploy_and_clean.sh \
+  -o "$output" || {
+    echo "❌ Failed to download stackhouse_deploy_and_clean.sh"
+    exit 1
+  }
 
-# Replace whole lines (simpler, works both on Linux and macOS sed)
+# Replace defaults with user input (keeping ${VAR:-...} format)
 sed -i.bak "s|^IMAGE_REPO=.*|IMAGE_REPO=\"\${IMAGE_REPO:-$rep_repo}\"|" "$output"
 sed -i.bak "s|^STACK_NAME=.*|STACK_NAME=\"\${STACK_NAME:-$rep_name}\"|" "$output"
 sed -i.bak "s|^STACK_FILE=.*|STACK_FILE=\"\${STACK_FILE:-$rep_file}\"|" "$output"
