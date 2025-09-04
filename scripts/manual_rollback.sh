@@ -10,7 +10,7 @@ set -euo pipefail
 # Environment variables:
 #   STACK_NAME     Name of the stack (required)
 #   IMAGE_REPO     Repository for the image (required)
-#   DIGEST_FILE    File storing digests (default: scripts/${STACK_NAME}_image_digests.log)
+#   DIGEST_FILE    File storing digests (default: ${STACK_NAME}_image_digests.log in repo root)
 #   TARGET_DIGEST  Digest to roll back to (optional; prompts if unset)
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$STACK_NAME|$LOG_TAG] $1"; }
@@ -21,7 +21,8 @@ main() {
   IMAGE_REPO="${IMAGE_REPO:-}"
   TARGET_DIGEST="${TARGET_DIGEST:-}"
   SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-  DIGEST_FILE="${DIGEST_FILE:-$SCRIPT_DIR/${STACK_NAME}_image_digests.log}"
+  ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
+  DIGEST_FILE="${DIGEST_FILE:-$ROOT_DIR/${STACK_NAME}_image_digests.log}"
   LOG_TAG="rollback"
 
   if [[ -z "$STACK_NAME" || -z "$IMAGE_REPO" ]]; then
@@ -32,7 +33,10 @@ main() {
   require docker
 
   if [[ ! -f "$DIGEST_FILE" ]]; then
-    echo "Digest log not found: $DIGEST_FILE" >&2
+    {
+      echo "Digest log not found: $DIGEST_FILE"
+      echo "Run deploy_and_cleanup.sh to generate it or set DIGEST_FILE to an existing log."
+    } >&2
     exit 1
   fi
 
