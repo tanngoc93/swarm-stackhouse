@@ -69,7 +69,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
   IMAGE_REPO=myorg/myimage \
   STACK_NAME=my_stack \
   STACK_FILE=/root/docker/app-stack.yml \
-  ./ensure_swarm_cleanup_and_deploy.sh /root/run/swarm_cleanup main
+  ./ensure_swarm_cleanup_and_deploy.sh /tmp/swarm_cleanup main
   ```
 
 ## Development

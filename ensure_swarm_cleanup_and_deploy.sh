@@ -9,7 +9,7 @@
 # Usage:
 #   ./ensure_swarm_cleanup_and_deploy.sh [TARGET_DIR] [BRANCH]
 #
-#   TARGET_DIR (optional) : destination directory (default: $HOME/run/swarm_cleanup)
+#   TARGET_DIR (optional) : destination directory (default: /tmp/swarm_cleanup)
 #   BRANCH     (optional) : git branch to track (default: main)
 #
 # Environment variables (with sane defaults):
@@ -27,7 +27,7 @@ set -euo pipefail
 
 # -------- Config (defaults) --------
 REPO_URL="https://github.com/tanngoc93/swarm_cleanup.git"
-TARGET_DIR="${1:-$HOME/run/swarm_cleanup}"
+TARGET_DIR="${1:-/tmp/swarm_cleanup}"
 BRANCH="${2:-main}"
 
 # Deployment ENV (can be overridden by caller)
