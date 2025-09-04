@@ -13,6 +13,7 @@ set -euo pipefail
 #   CLEANUP_SCRIPT      Script to run after deployment (default: ./scripts/run_swarm_cleanup.sh)
 #   CLEANUP_STACK_FILE  Stack file used by the cleanup script (default: ./docker/cleanup-stack.yml)
 #   CLEANUP_STACK_NAME  Stack name used by the cleanup script (default: swarm-cleanup)
+#   DIGEST_DIR        Directory to store image digest logs (default: ./digests)
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$STACK_NAME|$IMAGE_TAG] $1"; }
 require() { command -v "$1" >/dev/null 2>&1 || { echo "command not found: $1" >&2; exit 1; }; }
@@ -28,6 +29,7 @@ main() {
   CLEANUP_SCRIPT="${CLEANUP_SCRIPT:-$SCRIPT_DIR/scripts/run_swarm_cleanup.sh}"
   CLEANUP_STACK_FILE="${CLEANUP_STACK_FILE:-$SCRIPT_DIR/docker/cleanup-stack.yml}"
   CLEANUP_STACK_NAME="${CLEANUP_STACK_NAME:-swarm-cleanup}"
+  DIGEST_DIR="${DIGEST_DIR:-$SCRIPT_DIR/digests}"
 
   if [[ -z "$IMAGE_REPO" || -z "$STACK_NAME" || -z "$STACK_FILE" ]]; then
     echo "IMAGE_REPO, STACK_NAME and STACK_FILE must be set" >&2
@@ -94,7 +96,8 @@ main() {
 
       deploy_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image_ref" 2>/dev/null | awk -F'@' '{print $2}')
       if [[ -n "$deploy_digest" ]]; then
-        digest_log="$SCRIPT_DIR/${STACK_NAME}_image_digests.log"
+        mkdir -p "$DIGEST_DIR"
+        digest_log="$DIGEST_DIR/${STACK_NAME}_image_digests.log"
         echo "$deploy_digest" >> "$digest_log"
         tail -n 5 "$digest_log" > "$digest_log.tmp" && mv "$digest_log.tmp" "$digest_log"
         log "📝 Recorded digest: $deploy_digest"
