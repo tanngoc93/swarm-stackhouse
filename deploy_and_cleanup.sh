@@ -92,6 +92,14 @@ main() {
         log "✅ Using specific tag: $image_ref"
       fi
 
+      deploy_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image_ref" 2>/dev/null | awk -F'@' '{print $2}')
+      if [[ -n "$deploy_digest" ]]; then
+        digest_log="$SCRIPT_DIR/${STACK_NAME}_image_digests.log"
+        echo "$deploy_digest" >> "$digest_log"
+        tail -n 5 "$digest_log" > "$digest_log.tmp" && mv "$digest_log.tmp" "$digest_log"
+        log "📝 Recorded digest: $deploy_digest"
+      fi
+
       update_services=true
       if [[ -z $(docker stack services "$STACK_NAME" --format '{{.Name}}') ]]; then
         log "⚙️ Stack '$STACK_NAME' is missing. Deploying from scratch..."
