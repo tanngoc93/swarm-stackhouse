@@ -1,3 +1,4 @@
+# Docker Swarm stack that runs the cleanup script on every node
 services:
   swarm_cleanup:
     image: alpine:3.19
