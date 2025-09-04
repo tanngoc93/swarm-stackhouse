@@ -84,7 +84,7 @@ clone_fresh() {
   # Atomic replace
   mkdir -p "$(dirname "$TARGET_DIR")"
   if [[ -e "$TARGET_DIR" ]]; then
-    log "♻️  Replacing existing directory: $TARGET_DIR"
+    log "♻️ Replacing existing directory: $TARGET_DIR"
     rm -rf "$TARGET_DIR"
   fi
   mv "$tmpdir/repo" "$TARGET_DIR"
