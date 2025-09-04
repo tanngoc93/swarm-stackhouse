@@ -37,6 +37,7 @@ while [[ -z "$STACK_FILE" ]]; do
   read -rp "STACK_FILE: " STACK_FILE
 done
 
+# Escape user input for safe sed replacement
 escape_sed() { printf '%s' "$1" | sed -e 's/[\\/|&]/\\&/g'; }
 
 rep_repo=$(escape_sed "$IMAGE_REPO")
@@ -46,10 +47,14 @@ rep_file=$(escape_sed "$STACK_FILE")
 timestamp=$(date +%s)
 output="deploy_${STACK_NAME}_${timestamp}.sh"
 
-cp "$SCRIPT_DIR/stackhouse_deploy_and_clean.sh" "$output"
-sed -i "s|^IMAGE_REPO=.*$|IMAGE_REPO=\"$rep_repo\"|" "$output"
-sed -i "s|^STACK_NAME=.*$|STACK_NAME=\"$rep_name\"|" "$output"
-sed -i "s|^STACK_FILE=.*$|STACK_FILE=\"$rep_file\"|" "$output"
+cp stackhouse_deploy_and_clean.sh "$output"
+
+# Replace whole lines (simpler, works both on Linux and macOS sed)
+sed -i.bak "s|^IMAGE_REPO=.*|IMAGE_REPO=\"\${IMAGE_REPO:-$rep_repo}\"|" "$output"
+sed -i.bak "s|^STACK_NAME=.*|STACK_NAME=\"\${STACK_NAME:-$rep_name}\"|" "$output"
+sed -i.bak "s|^STACK_FILE=.*|STACK_FILE=\"\${STACK_FILE:-$rep_file}\"|" "$output"
+rm -f "$output.bak"
+
 chmod +x "$output"
 
-echo "\n✅ Created deployment script: $output"
+echo -e "\n✅ Created deployment script: $output"
