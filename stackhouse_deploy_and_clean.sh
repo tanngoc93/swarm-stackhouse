@@ -72,38 +72,50 @@ ensure_executable_if_exists() {
 }
 
 refresh_repo() {
-  # Clone into a temp dir, then atomically replace TARGET_DIR
-  local tmpdir
-  tmpdir="$(mktemp -d)"
-  log "⬇️  Cloning $REPO_URL (branch: $BRANCH) into a temporary directory..."
-  git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$tmpdir/repo"
-  log "✅ Clone completed."
+  if [[ -d "$TARGET_DIR/.git" ]]; then
+    log "🔄 Existing git repo found, fetching latest changes..."
+    (
+      cd "$TARGET_DIR"
+      git fetch origin "$BRANCH" --depth=1
+      git reset --hard "origin/$BRANCH"
+    )
+    # Ensure scripts are executable
+    ensure_executable_if_exists "$TARGET_DIR/scripts/run_swarm_cleanup.sh"
+    ensure_executable_if_exists "$TARGET_DIR/scripts/deploy_and_cleanup.sh"
+    ensure_executable_if_exists "$TARGET_DIR/scripts/manual_rollback.sh"
 
-  # Make commonly used scripts executable (idempotent)
-  ensure_executable_if_exists "$tmpdir/repo/scripts/run_swarm_cleanup.sh"
-  ensure_executable_if_exists "$tmpdir/repo/scripts/deploy_and_cleanup.sh"
-  ensure_executable_if_exists "$tmpdir/repo/scripts/manual_rollback.sh"
+    # Ensure digests directory always exists
+    mkdir -p "$TARGET_DIR/digests"
+    log "📂 Ensured digests directory exists."
+    log "🏁 Repo refreshed at: $TARGET_DIR"
+  else
+    log "⚠️ $TARGET_DIR is missing or not a git repo. Cloning fresh..."
+    local tmpdir
+    tmpdir="$(mktemp -d)"
+    git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$tmpdir/repo"
 
-  # Preserve existing digest logs (if any)
-  if [[ -d "$TARGET_DIR/digests" ]]; then
-    cp -r "$TARGET_DIR/digests" "$tmpdir/repo/" 2>/dev/null || true
-    log "🗃️  Preserved existing digests directory."
+    # Ensure scripts are executable
+    ensure_executable_if_exists "$tmpdir/repo/scripts/run_swarm_cleanup.sh"
+    ensure_executable_if_exists "$tmpdir/repo/scripts/deploy_and_cleanup.sh"
+    ensure_executable_if_exists "$tmpdir/repo/scripts/manual_rollback.sh"
+
+    # Preserve digests if exists
+    if [[ -d "$TARGET_DIR/digests" ]]; then
+      cp -r "$TARGET_DIR/digests" "$tmpdir/repo/" 2>/dev/null || true
+      log "🗃️ Preserved existing digests directory."
+    fi
+
+    # Replace old repo
+    mkdir -p "$(dirname "$TARGET_DIR")"
+    [[ -e "$TARGET_DIR" ]] && rm -rf "$TARGET_DIR"
+    mv "$tmpdir/repo" "$TARGET_DIR"
+    rmdir "$tmpdir" 2>/dev/null || true
+
+    # Ensure digests directory always exists
+    mkdir -p "$TARGET_DIR/digests"
+    log "📂 Ensured digests directory exists."
+    log "🏁 Repo cloned fresh at: $TARGET_DIR"
   fi
-
-  # Atomic replace of the target directory
-  mkdir -p "$(dirname "$TARGET_DIR")"
-  if [[ -e "$TARGET_DIR" ]]; then
-    log "♻️ Replacing existing directory: $TARGET_DIR"
-    rm -rf "$TARGET_DIR"
-  fi
-  mv "$tmpdir/repo" "$TARGET_DIR"
-  rmdir "$tmpdir" 2>/dev/null || true
-
-  # Ensure digests directory always exists (new or preserved)
-  mkdir -p "$TARGET_DIR/digests"
-  log "📂 Ensured digests directory exists."
-
-  log "🏁 Repo ready at: $TARGET_DIR"
 }
 
 run_deploy() {
