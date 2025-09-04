@@ -23,24 +23,7 @@ services:
     command: /bin/sh "/app/start.sh"
     deploy:
       mode: replicated
-      replicas: 2
-      labels:
-        - "traefik.enable=true"
-        - "traefik.docker.network=public-network"
-        # Middleware: redirect
-        - "traefik.http.middlewares.web-redirect.redirectscheme.scheme=https"
-        # HTTP Router
-        - "traefik.http.routers.web-http.rule=Host(`example.com`)"
-        - "traefik.http.routers.web-http.entrypoints=web"
-        - "traefik.http.routers.web-http.middlewares=web-redirect"
-        - "traefik.http.routers.web-http.service=web-svc"
-        # HTTPS Router
-        - "traefik.http.routers.web-secured.rule=Host(`example.com`)"
-        - "traefik.http.routers.web-secured.entrypoints=websecured"
-        - "traefik.http.routers.web-secured.tls.certresolver=letsencrypt"
-        - "traefik.http.routers.web-secured.service=web-svc"
-        # Service port
-        - "traefik.http.services.web-svc.loadbalancer.server.port=3000"
+      replicas: 1
       update_config:
         parallelism: 2
         delay: 10s
