@@ -1,25 +1,28 @@
 # Swarm Stackhouse
 
-Bash utilities for deploying Docker Swarm stacks, cleaning old images and
-rolling back by digest.
+Collection of Bash utilities to deploy Docker Swarm stacks, clean up old images, and roll back services by image digest.
+
+## Requirements
+
+- Bash
+- Docker CLI available in `PATH`
+- Access to a Docker daemon in Swarm mode
 
 ## Quick start
 
 1. **Generate a deployment script**
 
-   Run the setup script directly from the internet and answer the prompts:
+   Run the setup script from the internet and answer the prompts:
 
    ```bash
    bash <(curl -fsSL https://raw.githubusercontent.com/tanngoc93/swarm-stackhouse/main/setup.sh)
    ```
 
-   A file named `deploy_<STACK_NAME>_<timestamp>.sh` will be created in the
-   current directory with your values baked in.
+   The command creates `deploy_<STACK_NAME>_<timestamp>.sh` in the current directory with your answers baked in.
 
-2. **Deploy**
+2. **Deploy the stack**
 
-   Execute the generated script to deploy or update your stack. Optionally
-   override the image tag at runtime (defaults to `latest`):
+   Execute the generated script to deploy or update your stack. Optionally override the image tag at runtime (defaults to `latest`):
 
    ```bash
    IMAGE_TAG=v1 ./deploy_<STACK_NAME>_<timestamp>.sh
@@ -27,8 +30,7 @@ rolling back by digest.
 
 ## Logs and debugging
 
-* Logs are written to `/var/log/deploy_<STACK_NAME>_uniq.log` by default.
-  View them with:
+* Logs are written to `/var/log/deploy_<STACK_NAME>_uniq.log`. Tail them with:
 
   ```bash
   tail -f /var/log/deploy_<STACK_NAME>_uniq.log
@@ -42,35 +44,26 @@ rolling back by digest.
 
 ## Manual rollback
 
-The repository provides `scripts/manual_rollback.sh` to roll back services to a
-previously deployed image digest. Run it like this:
+Use `scripts/manual_rollback.sh` to roll back services to a previously deployed image digest:
 
 ```bash
 STACK_NAME=my_stack IMAGE_REPO=myorg/myimage \
   bash /tmp/swarm-stackhouse/scripts/manual_rollback.sh
 ```
 
-You will be prompted to select a stored digest. Set `TARGET_DIGEST` to skip the
-prompt.
+You will be prompted to select a stored digest. Set `TARGET_DIGEST` to skip the prompt.
 
-You may create a convenience wrapper (e.g. `rollback_swarm.sh`) containing the
-above command and make it executable with `chmod +x rollback_swarm.sh`.
+You can create a wrapper (e.g. `rollback_swarm.sh`) containing the above command and make it executable with `chmod +x rollback_swarm.sh`.
 
-## Running rollback
+## Roll back to a specific digest
 
-To roll back using a specific digest:
+To roll back using a known digest:
 
 ```bash
 STACK_NAME=my_stack IMAGE_REPO=myorg/myimage \
   TARGET_DIGEST=sha256:deadbeef \
   bash /tmp/swarm-stackhouse/scripts/manual_rollback.sh
 ```
-
-## Requirements
-
-- Bash
-- Docker CLI available in `PATH`
-- Access to a Docker daemon in Swarm mode
 
 ## Development
 
@@ -83,4 +76,3 @@ bash -n scripts/*.sh stackhouse_deploy_and_clean.sh setup.sh
 ## License
 
 This project is provided under the MIT License.
-
