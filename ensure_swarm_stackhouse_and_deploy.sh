@@ -4,7 +4,7 @@
 # Purpose:
 #   - Ensure the public repo "swarm-stackhouse" exists locally (HTTPS clone).
 #   - If the remote branch has a newer commit, re-clone a fresh copy (atomic replace).
-#   - Run the repo's ./deploy_and_cleanup.sh with the provided ENV configuration.
+#   - Run the repo's ./scripts/deploy_and_cleanup.sh with the provided ENV configuration.
 #
 # Usage:
 #   ./ensure_swarm_stackhouse_and_deploy.sh [TARGET_DIR] [BRANCH]
@@ -79,7 +79,7 @@ clone_fresh() {
 
   # Make commonly used scripts executable (idempotent)
   ensure_executable_if_exists "$tmpdir/repo/scripts/run_swarm_cleanup.sh"
-  ensure_executable_if_exists "$tmpdir/repo/deploy_and_cleanup.sh"
+  ensure_executable_if_exists "$tmpdir/repo/scripts/deploy_and_cleanup.sh"
 
   # Atomic replace
   mkdir -p "$(dirname "$TARGET_DIR")"
@@ -94,11 +94,11 @@ clone_fresh() {
 }
 
 run_deploy() {
-  # Execute deploy_and_cleanup.sh with the configured ENV
-  local deploy_script="$TARGET_DIR/deploy_and_cleanup.sh"
+  # Execute scripts/deploy_and_cleanup.sh with the configured ENV
+  local deploy_script="$TARGET_DIR/scripts/deploy_and_cleanup.sh"
   [[ -x "$deploy_script" ]] || abort "$deploy_script not found or not executable"
 
-  log "🚀 Running deploy_and_cleanup.sh with ENV:"
+  log "🚀 Running scripts/deploy_and_cleanup.sh with ENV:"
   log "    IMAGE_TAG  = $IMAGE_TAG"
   log "    IMAGE_REPO = $IMAGE_REPO"
   log "    STACK_NAME = $STACK_NAME"
@@ -140,7 +140,7 @@ main() {
       log "✅ Repo is up to date."
       # Still ensure scripts are executable (idempotent)
       ensure_executable_if_exists "$TARGET_DIR/scripts/run_swarm_cleanup.sh"
-      ensure_executable_if_exists "$TARGET_DIR/deploy_and_cleanup.sh"
+      ensure_executable_if_exists "$TARGET_DIR/scripts/deploy_and_cleanup.sh"
     fi
   fi
 

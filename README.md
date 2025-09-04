@@ -52,7 +52,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 Run basic syntax checks before submitting changes:
 
 ```bash
-bash -n deploy_and_cleanup.sh manual_rollback.sh scripts/*.sh ensure_swarm_stackhouse_and_deploy.sh
+bash -n scripts/*.sh manual_rollback.sh ensure_swarm_stackhouse_and_deploy.sh
 ```
 
 ## License
