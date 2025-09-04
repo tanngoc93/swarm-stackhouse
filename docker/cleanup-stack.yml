@@ -3,8 +3,8 @@ services:
   swarm_cleanup:
     image: alpine:3.19
     environment:
-      REPO_URL: "${REPO_URL:-https://github.com/tanngoc93/swarm_cleanup.git}"
-      REPO_DIR: "${REPO_DIR:-/tmp/swarm_cleanup}"
+      REPO_URL: "${REPO_URL:-https://github.com/tanngoc93/swarm-stackhouse.git}"
+      REPO_DIR: "${REPO_DIR:-/tmp/swarm-stackhouse}"
       SCRIPT: "${SCRIPT:-scripts/cleanup_docker_images.sh}"
       IMAGE_REPO: "${IMAGE_REPO}"
       DRY_RUN: "${DRY_RUN:-0}"
