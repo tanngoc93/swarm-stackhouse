@@ -19,9 +19,13 @@ prompt_non_empty() {
   # Prompt the user until a non-empty value is entered
   local var_name="$1" prompt="$2" value
   while true; do
-    read -rp "$prompt" value
+    # Read directly from the user's TTY so piping the script via curl works
+    if ! read -rp "$prompt" value </dev/tty; then
+      echo "Input aborted" >&2
+      exit 1
+    fi
     [[ -n "$value" ]] && { printf '%s' "$value"; return; }
-    echo "$var_name cannot be empty."
+    echo "$var_name cannot be empty." >&2
   done
 }
 
