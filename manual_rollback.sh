@@ -4,27 +4,28 @@ set -euo pipefail
 # manual_rollback.sh - Roll back services in a Docker Swarm stack to a previously deployed image digest.
 #
 # Usage:
-#   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage ./scripts/manual_rollback.sh
-#   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage TARGET_DIGEST=sha256:deadbeef ./scripts/manual_rollback.sh
+#   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage ./manual_rollback.sh
+#   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage TARGET_DIGEST=sha256:deadbeef ./manual_rollback.sh
 #
-# Environment variables:
-#   STACK_NAME     Name of the stack (required)
-#   IMAGE_REPO     Repository for the image (required)
-#   DIGEST_FILE    File storing digests (default: ${STACK_NAME}_image_digests.log in repo root)
-#   TARGET_DIGEST  Digest to roll back to (optional; prompts if unset)
+# Environment variables (with defaults):
+#   IMAGE_REPO    Image repository (default: myorg/myapp)
+#   STACK_NAME    Stack name (default: app_stack)
+#   DIGEST_FILE   File storing digests (default: ./app_stack_image_digests.log)
+#   TARGET_DIGEST Digest to roll back to (optional; prompts if unset)
+
+# -------- Config (defaults) --------
+IMAGE_REPO="${IMAGE_REPO:-myorg/myapp}"
+STACK_NAME="${STACK_NAME:-app_stack}"
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+ROOT_DIR="$SCRIPT_DIR"
+DIGEST_FILE="${DIGEST_FILE:-$ROOT_DIR/${STACK_NAME}_image_digests.log}"
+TARGET_DIGEST="${TARGET_DIGEST:-}"
+LOG_TAG="rollback"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$STACK_NAME|$LOG_TAG] $1"; }
 require() { command -v "$1" >/dev/null 2>&1 || { echo "command not found: $1" >&2; exit 1; }; }
 
 main() {
-  STACK_NAME="${STACK_NAME:-}"
-  IMAGE_REPO="${IMAGE_REPO:-}"
-  TARGET_DIGEST="${TARGET_DIGEST:-}"
-  SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-  ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
-  DIGEST_FILE="${DIGEST_FILE:-$ROOT_DIR/${STACK_NAME}_image_digests.log}"
-  LOG_TAG="rollback"
-
   if [[ -z "$STACK_NAME" || -z "$IMAGE_REPO" ]]; then
     echo "STACK_NAME and IMAGE_REPO must be set" >&2
     exit 1
