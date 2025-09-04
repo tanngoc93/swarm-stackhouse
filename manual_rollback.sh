@@ -10,15 +10,16 @@ set -euo pipefail
 # Environment variables (with defaults):
 #   IMAGE_REPO    Image repository (default: myorg/myapp)
 #   STACK_NAME    Stack name (default: app_stack)
-#   DIGEST_FILE   File storing digests (default: ./app_stack_image_digests.log)
+#   DIGEST_DIR    Directory storing digest logs (default: ./digests)
+#   DIGEST_FILE   File storing digests (default: ./digests/app_stack_image_digests.log)
 #   TARGET_DIGEST Digest to roll back to (optional; prompts if unset)
 
 # -------- Config (defaults) --------
 IMAGE_REPO="${IMAGE_REPO:-myorg/myapp}"
 STACK_NAME="${STACK_NAME:-app_stack}"
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-ROOT_DIR="$SCRIPT_DIR"
-DIGEST_FILE="${DIGEST_FILE:-$ROOT_DIR/${STACK_NAME}_image_digests.log}"
+DIGEST_DIR="${DIGEST_DIR:-$SCRIPT_DIR/digests}"
+DIGEST_FILE="${DIGEST_FILE:-$DIGEST_DIR/${STACK_NAME}_image_digests.log}"
 TARGET_DIGEST="${TARGET_DIGEST:-}"
 LOG_TAG="rollback"
 

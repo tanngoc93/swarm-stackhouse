@@ -1,3 +1,4 @@
 # Deployment digest logs
+digests/
 *_image_digests.log
 
