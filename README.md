@@ -37,10 +37,10 @@ and other sample values with settings for your environment.
 
 ## Logs and debugging
 
-* Logs are written to `log/deploy_<STACK_NAME>_uniq.log` in the repository root. Tail them with:
+* Logs are written to `/tmp/swarm-stackhouse/log/deploy_<STACK_NAME>_uniq.log` in the repository root. Tail them with:
 
   ```bash
-  tail -f log/deploy_<STACK_NAME>_uniq.log
+  tail -f /tmp/swarm-stackhouse/log/deploy_<STACK_NAME>_uniq.log
   ```
 
 * For verbose debugging output, run the deployment script with `bash -x`:
