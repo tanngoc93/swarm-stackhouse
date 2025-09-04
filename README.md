@@ -58,10 +58,10 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
   - `STACK_FILE` path to stack file (default `docker/cleanup-stack.yml`)
   - `STACK_NAME` name for the temporary stack (default `swarm-cleanup`)
 
-- **Roll back to a previous image digest**
-  ```bash
-  STACK_NAME=my_stack IMAGE_REPO=myorg/myimage ./scripts/manual_rollback.sh
-  ```
+ - **Roll back to a previous image digest**
+   ```bash
+   STACK_NAME=my_stack IMAGE_REPO=myorg/myimage ./manual_rollback.sh
+   ```
 
 - **Ensure repo and deploy**
   Clone or update this repo and run `deploy_and_cleanup.sh` in one step:
@@ -77,7 +77,7 @@ Simple Bash utilities for managing Docker Swarm stacks and cleaning up unused im
 Run basic syntax checks before submitting changes:
 
 ```bash
-bash -n deploy_and_cleanup.sh scripts/*.sh ensure_swarm_cleanup_and_deploy.sh
+bash -n deploy_and_cleanup.sh manual_rollback.sh scripts/*.sh ensure_swarm_cleanup_and_deploy.sh
 ```
 
 ## License
