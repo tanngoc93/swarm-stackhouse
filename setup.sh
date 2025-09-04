@@ -1,7 +1,32 @@
 #!/usr/bin/env bash
-# setup.sh - interactive generator for deploy scripts based on stackhouse_deploy_and_clean.sh
+## setup.sh
+# Interactive helper that fetches the latest `stackhouse_deploy_and_clean.sh`
+# from GitHub and embeds user supplied variables into a ready-to-run
+# deployment script. All prompts are interactive to keep usage simple.
 
 set -euo pipefail
+
+#----- utilities -------------------------------------------------------
+require() {
+  # Ensure a required command exists in PATH
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "Error: '$1' is required but not installed." >&2
+    exit 1
+  }
+}
+
+prompt_non_empty() {
+  # Prompt the user until a non-empty value is entered
+  local var_name="$1" prompt="$2" value
+  while true; do
+    read -rp "$prompt" value
+    [[ -n "$value" ]] && { printf '%s' "$value"; return; }
+    echo "$var_name cannot be empty."
+  done
+}
+
+require curl
+require sed
 
 cat <<'DESC'
 =====================================================================
@@ -17,23 +42,10 @@ this directory with these values baked in.
 =====================================================================
 DESC
 
-read -rp "IMAGE_REPO: " IMAGE_REPO
-while [[ -z "$IMAGE_REPO" ]]; do
-  echo "IMAGE_REPO cannot be empty."
-  read -rp "IMAGE_REPO: " IMAGE_REPO
-done
-
-read -rp "STACK_NAME: " STACK_NAME
-while [[ -z "$STACK_NAME" ]]; do
-  echo "STACK_NAME cannot be empty."
-  read -rp "STACK_NAME: " STACK_NAME
-done
-
-read -rp "STACK_FILE: " STACK_FILE
-while [[ -z "$STACK_FILE" ]]; do
-  echo "STACK_FILE cannot be empty."
-  read -rp "STACK_FILE: " STACK_FILE
-done
+#----- prompt for settings -------------------------------------------
+IMAGE_REPO=$(prompt_non_empty "IMAGE_REPO" "IMAGE_REPO: ")
+STACK_NAME=$(prompt_non_empty "STACK_NAME" "STACK_NAME: ")
+STACK_FILE=$(prompt_non_empty "STACK_FILE" "STACK_FILE: ")
 
 # Escape user input for safe sed replacement
 escape_sed() { printf '%s' "$1" | sed -e 's/[\\/|&]/\\&/g'; }

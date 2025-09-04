@@ -71,7 +71,7 @@ ensure_executable_if_exists() {
   fi
 }
 
-clone_fresh() {
+refresh_repo() {
   # Clone into a temp dir, then atomically replace TARGET_DIR
   local tmpdir
   tmpdir="$(mktemp -d)"
@@ -84,7 +84,7 @@ clone_fresh() {
   ensure_executable_if_exists "$tmpdir/repo/scripts/deploy_and_cleanup.sh"
   ensure_executable_if_exists "$tmpdir/repo/scripts/manual_rollback.sh"
 
-  # Atomic replace
+  # Atomic replace of the target directory
   mkdir -p "$(dirname "$TARGET_DIR")"
   if [[ -e "$TARGET_DIR" ]]; then
     log "♻️ Replacing existing directory: $TARGET_DIR"
@@ -126,19 +126,19 @@ main() {
   # 2) Clone or refresh if outdated
   if [[ ! -d "$TARGET_DIR/.git" ]]; then
     log "ℹ️  Local repo not found at $TARGET_DIR. Cloning fresh..."
-    clone_fresh
+    refresh_repo
   else
     local local_head
     local_head="$(get_local_head)"
     if [[ -z "$local_head" ]]; then
       log "⚠️  $TARGET_DIR exists but is not a valid git repo. Cloning fresh..."
-      clone_fresh
+      refresh_repo
     elif [[ "$local_head" != "$remote_head" ]]; then
       log "🆕 Remote is newer:"
       log "    local : $local_head"
       log "    remote: $remote_head"
       log "➡️  Re-cloning a fresh copy..."
-      clone_fresh
+      refresh_repo
     else
       log "✅ Repo is up to date."
       # Still ensure scripts are executable (idempotent)
