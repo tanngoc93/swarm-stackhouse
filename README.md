@@ -15,6 +15,7 @@ All scripts are written in Bash and include comments for easy maintenance.
 |-------|-------------|
 | `scripts/cleanup_docker_images.sh` | Remove unused Docker images and containers on a node. |
 | `scripts/run_swarm_cleanup.sh` | Deploy a temporary stack that runs the cleanup script on every Swarm node. |
+| `scripts/manual_rollback.sh` | Roll back a stack's services to a previously recorded image digest. |
 | `deploy_and_cleanup.sh` | Deploy or update a Swarm stack, then trigger a cluster-wide cleanup. |
 | `ensure_swarm_cleanup_and_deploy.sh` | Ensure this repo exists locally and run `deploy_and_cleanup.sh` with your configuration. |
 
@@ -62,6 +63,14 @@ STACK_NAME=my_stack \
 STACK_FILE=/root/docker/app-stack.yml \
 ./ensure_swarm_cleanup_and_deploy.sh /root/run/swarm_cleanup main
 ```
+
+### 5. Roll back to a previous image digest
+
+```bash
+STACK_NAME=my_stack IMAGE_REPO=myorg/myimage ./scripts/manual_rollback.sh
+```
+
+The script lists the most recent digests recorded for the stack and prompts for the one to roll back to.
 
 ## Development
 
