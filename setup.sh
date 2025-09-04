@@ -54,9 +54,15 @@ curl -fsSL \
   }
 
 # Replace defaults with user input (keeping ${VAR:-...} format)
-sed -i.bak "s|^IMAGE_REPO=.*|IMAGE_REPO=\"\${IMAGE_REPO:-$rep_repo}\"|" "$output"
-sed -i.bak "s|^STACK_NAME=.*|STACK_NAME=\"\${STACK_NAME:-$rep_name}\"|" "$output"
-sed -i.bak "s|^STACK_FILE=.*|STACK_FILE=\"\${STACK_FILE:-$rep_file}\"|" "$output"
+image_repo_line=$(printf 'IMAGE_REPO="${IMAGE_REPO:-%s}"' "$rep_repo")
+stack_name_line=$(printf 'STACK_NAME="${STACK_NAME:-%s}"' "$rep_name")
+stack_file_line=$(printf 'STACK_FILE="${STACK_FILE:-%s}"' "$rep_file")
+
+sed -i.bak \
+  -e "s|^IMAGE_REPO=.*|$image_repo_line|" \
+  -e "s|^STACK_NAME=.*|$stack_name_line|" \
+  -e "s|^STACK_FILE=.*|$stack_file_line|" \
+  "$output"
 rm -f "$output.bak"
 
 chmod +x "$output"
