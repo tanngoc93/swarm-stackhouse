@@ -80,6 +80,7 @@ clone_fresh() {
   # Make commonly used scripts executable (idempotent)
   ensure_executable_if_exists "$tmpdir/repo/scripts/run_swarm_cleanup.sh"
   ensure_executable_if_exists "$tmpdir/repo/scripts/deploy_and_cleanup.sh"
+  ensure_executable_if_exists "$tmpdir/repo/scripts/manual_rollback.sh"
 
   # Atomic replace
   mkdir -p "$(dirname "$TARGET_DIR")"
@@ -141,6 +142,7 @@ main() {
       # Still ensure scripts are executable (idempotent)
       ensure_executable_if_exists "$TARGET_DIR/scripts/run_swarm_cleanup.sh"
       ensure_executable_if_exists "$TARGET_DIR/scripts/deploy_and_cleanup.sh"
+      ensure_executable_if_exists "$TARGET_DIR/scripts/manual_rollback.sh"
     fi
   fi
 
