@@ -23,7 +23,7 @@ main() {
   local wait_timeout=${WAIT_TIMEOUT:-300}
   local poll_interval=${POLL_INTERVAL:-3}
   local service_name="${stack_name}_swarm_cleanup"
-  local deployed=0
+  deployed=0
 
   if ! [[ "$wait_timeout" =~ ^[0-9]+$ && "$poll_interval" =~ ^[0-9]+$ ]]; then
     log "WAIT_TIMEOUT and POLL_INTERVAL must be integers"
@@ -41,7 +41,7 @@ main() {
   fi
 
   cleanup_stack() {
-    if [[ "$deployed" -eq 1 ]]; then
+    if [[ "${deployed:-0}" -eq 1 ]]; then
       log "🧹 Removing stack..."
       docker stack rm "$stack_name" || log "[⚠️] Failed to remove stack: $stack_name"
     fi
