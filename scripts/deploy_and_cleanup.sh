@@ -66,22 +66,22 @@ main() {
     log "📄 Stack file: $STACK_FILE"
 
     skip_deploy=false
-    existing_services=($(docker stack services "$STACK_NAME" --format '{{.Name}}' 2>/dev/null))
+    existing_services=($(docker stack services "$STACK_NAME" --format '{{.Name}}' 2>/dev/null || true))
     if [[ "$IMAGE_TAG" != "latest" && ${#existing_services[@]} -gt 0 ]]; then
-      all_services_match=true
+      mismatched_services=()
       for service_name in "${existing_services[@]}"; do
         current_image=$(docker service inspect "$service_name" -f '{{index .Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null || true)
         current_tag=$(echo "$current_image" | sed -e 's/@.*//' | awk -F':' '{print $NF}')
         if [[ "$current_tag" != "$IMAGE_TAG" ]]; then
-          log "🔎 Service $service_name running different tag ($current_tag). Deploy needed."
-          all_services_match=false
-          break
+          mismatched_services+=("$service_name ($current_tag)")
         fi
       done
 
-      if $all_services_match; then
+      if [[ ${#mismatched_services[@]} -eq 0 ]]; then
         log "♻️ All services already running image tag $IMAGE_TAG. Skipping deploy/update."
         skip_deploy=true
+      else
+        log "🔎 Services needing deploy (expected $IMAGE_TAG): ${mismatched_services[*]}"
       fi
     fi
 
