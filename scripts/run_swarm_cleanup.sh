@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+deployed=0
+stack_name=""
+
 # run_swarm_cleanup.sh - deploy a temporary stack to clean unused images on all nodes.
 #
 # Environment variables:
@@ -13,17 +16,23 @@ set -euo pipefail
 log() { printf '%s\n' "$*"; }
 require() { command -v "$1" >/dev/null 2>&1 || { log "command not found: $1"; exit 1; }; }
 
+cleanup_stack() {
+  if [[ "${deployed:-0}" -eq 1 && -n "${stack_name:-}" ]]; then
+    log "🧹 Removing stack..."
+    docker stack rm "$stack_name" || log "[⚠️] Failed to remove stack: $stack_name"
+  fi
+}
+
 main() {
   require docker
 
   local script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
   local stack_file="${STACK_FILE:-$script_dir/../docker/cleanup-stack.yml}"
-  local stack_name="${STACK_NAME:-swarm-cleanup}"
+  stack_name="${STACK_NAME:-swarm-cleanup}"
   local image_repo="${IMAGE_REPO:-}"
   local wait_timeout=${WAIT_TIMEOUT:-300}
   local poll_interval=${POLL_INTERVAL:-3}
   local service_name="${stack_name}_swarm_cleanup"
-  local deployed=0
 
   if ! [[ "$wait_timeout" =~ ^[0-9]+$ && "$poll_interval" =~ ^[0-9]+$ ]]; then
     log "WAIT_TIMEOUT and POLL_INTERVAL must be integers"
@@ -40,12 +49,6 @@ main() {
     exit 1
   fi
 
-  cleanup_stack() {
-    if [[ "$deployed" -eq 1 ]]; then
-      log "🧹 Removing stack..."
-      docker stack rm "$stack_name" || log "[⚠️] Failed to remove stack: $stack_name"
-    fi
-  }
   trap cleanup_stack EXIT
 
   log "🚀 Deploy cleanup stack..."
