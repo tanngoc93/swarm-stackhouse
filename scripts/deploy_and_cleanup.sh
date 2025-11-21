@@ -66,7 +66,7 @@ main() {
     log "📄 Stack file: $STACK_FILE"
 
     skip_deploy=false
-    existing_services=($(docker stack services "$STACK_NAME" --format '{{.Name}}' 2>/dev/null))
+    existing_services=($(docker stack services "$STACK_NAME" --format '{{.Name}}' 2>/dev/null || true))
     if [[ "$IMAGE_TAG" != "latest" && ${#existing_services[@]} -gt 0 ]]; then
       mismatched_services=()
       for service_name in "${existing_services[@]}"; do
