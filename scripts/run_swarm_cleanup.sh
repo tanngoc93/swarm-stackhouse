@@ -13,12 +13,16 @@ set -euo pipefail
 log() { printf '%s\n' "$*"; }
 require() { command -v "$1" >/dev/null 2>&1 || { log "command not found: $1"; exit 1; }; }
 
+# Globals used by cleanup trap; populated in main
+stack_name=""
+deployed=0
+
 main() {
   require docker
 
   local script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
   local stack_file="${STACK_FILE:-$script_dir/../docker/cleanup-stack.yml}"
-  local stack_name="${STACK_NAME:-swarm-cleanup}"
+  stack_name="${STACK_NAME:-swarm-cleanup}"
   local image_repo="${IMAGE_REPO:-}"
   local wait_timeout=${WAIT_TIMEOUT:-300}
   local poll_interval=${POLL_INTERVAL:-3}
