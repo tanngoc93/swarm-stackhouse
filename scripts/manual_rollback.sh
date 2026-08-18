@@ -27,6 +27,44 @@ LOG_TAG="rollback"
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$STACK_NAME|$LOG_TAG] $1"; }
 require() { command -v "$1" >/dev/null 2>&1 || { echo "command not found: $1" >&2; exit 1; }; }
 
+update_service() {
+  local service_name="$1"
+  local image_ref="$2"
+  local restart_condition previous_task_id task_id task_state exit_code
+
+  restart_condition=$(docker service inspect "$service_name" \
+    --format '{{if .Spec.TaskTemplate.RestartPolicy}}{{.Spec.TaskTemplate.RestartPolicy.Condition}}{{end}}')
+  if [[ "$restart_condition" != "none" ]]; then
+    docker service update --image "$image_ref" --force "$service_name"
+    return
+  fi
+
+  previous_task_id=$(docker service ps "$service_name" --no-trunc --format '{{.ID}}' | head -n 1)
+  docker service update --detach=true --image "$image_ref" --force "$service_name"
+  for _ in $(seq 1 120); do
+    task_id=$(docker service ps "$service_name" --no-trunc --format '{{.ID}}' | head -n 1)
+    if [[ -n "$task_id" && "$task_id" != "$previous_task_id" ]]; then
+      task_state=$(docker inspect --format '{{.Status.State}}' "$task_id" 2>/dev/null || true)
+      case "$task_state" in
+        complete)
+          exit_code=$(docker inspect \
+            --format '{{if .Status.ContainerStatus}}{{.Status.ContainerStatus.ExitCode}}{{else}}1{{end}}' \
+            "$task_id" 2>/dev/null || echo 1)
+          [[ "$exit_code" == "0" ]]
+          return
+          ;;
+        failed|rejected|orphaned)
+          docker service ps "$service_name" --no-trunc >&2 || true
+          return 1
+          ;;
+      esac
+    fi
+    sleep 2
+  done
+  echo "Timed out waiting for one-shot service: $service_name" >&2
+  return 1
+}
+
 main() {
   if [[ -z "$STACK_NAME" || -z "$IMAGE_REPO" ]]; then
     echo "STACK_NAME and IMAGE_REPO must be set" >&2
@@ -34,6 +72,11 @@ main() {
   fi
 
   require docker
+
+  if [[ "$(docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null || true)" != "true" ]]; then
+    echo "This command must run on a Docker Swarm manager." >&2
+    exit 1
+  fi
 
   if [[ ! -f "$DIGEST_FILE" ]]; then
     {
@@ -82,9 +125,19 @@ main() {
 
   log "🔄 Updating services in stack: $STACK_NAME"
   mapfile -t SERVICES < <(docker stack services "$STACK_NAME" --format '{{.Name}}')
+  if [[ ${#SERVICES[@]} -eq 0 ]]; then
+    log "[❌] Stack has no services or does not exist: $STACK_NAME"
+    exit 1
+  fi
   for svc in "${SERVICES[@]}"; do
+    service_image=$(docker service inspect "$svc" \
+      --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}')
+    if [[ "$service_image" != "$IMAGE_REPO:"* && "$service_image" != "$IMAGE_REPO@"* ]]; then
+      log "Skipping service with a different image repository: $svc ($service_image)"
+      continue
+    fi
     log "Updating service: $svc"
-    if docker service update --image "$image_ref" --force "$svc" >/dev/null 2>&1; then
+    if update_service "$svc" "$image_ref"; then
       log "✅ Updated: $svc"
     else
       log "[❌] Failed to update: $svc"

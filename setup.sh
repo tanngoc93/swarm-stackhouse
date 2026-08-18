@@ -28,12 +28,20 @@ while [[ -z "$STACK_NAME" ]]; do
   echo "STACK_NAME cannot be empty."
   read -rp "STACK_NAME: " STACK_NAME
 done
+if [[ ! "$STACK_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
+  echo "STACK_NAME may contain only letters, numbers, dots, underscores, and hyphens." >&2
+  exit 1
+fi
 
 read -rp "STACK_FILE: " STACK_FILE
 while [[ -z "$STACK_FILE" ]]; do
   echo "STACK_FILE cannot be empty."
   read -rp "STACK_FILE: " STACK_FILE
 done
+if [[ ! -f "$STACK_FILE" ]]; then
+  echo "STACK_FILE does not exist: $STACK_FILE" >&2
+  exit 1
+fi
 
 # Escape user input for safe sed replacement
 escape_sed() { printf '%s' "$1" | sed -e 's/[\\/|&]/\\&/g'; }

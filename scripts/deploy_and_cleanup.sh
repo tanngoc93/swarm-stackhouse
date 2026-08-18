@@ -14,6 +14,7 @@ set -euo pipefail
 #   CLEANUP_STACK_FILE  Stack file used by the cleanup script (default: ../docker/cleanup-stack.yml)
 #   CLEANUP_STACK_NAME  Stack name used by the cleanup script (default: swarm-cleanup)
 #   DIGEST_DIR        Directory to store image digest logs (default: ../digests)
+#   DEPLOY_BACKGROUND Run asynchronously when true (default: false)
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$STACK_NAME|$IMAGE_TAG] $1"; }
 require() { command -v "$1" >/dev/null 2>&1 || { echo "command not found: $1" >&2; exit 1; }; }
@@ -89,25 +90,42 @@ main() {
 
   require docker
 
+  if [[ ! -f "$STACK_FILE" ]]; then
+    echo "Stack file not found: $STACK_FILE" >&2
+    exit 1
+  fi
+
+  if [[ "$(docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null || true)" != "true" ]]; then
+    echo "This command must run on a Docker Swarm manager." >&2
+    exit 1
+  fi
+
   if [[ -f "$LOCK_FILE" ]]; then
-    prev_pid=$(cat "$LOCK_FILE")
+    prev_pid=$(cat "$LOCK_FILE" 2>/dev/null || true)
     if ps -p "$prev_pid" >/dev/null 2>&1; then
-      echo "⚠️ Killing old deploy process (PID $prev_pid)..."
-      kill "$prev_pid" || true
-      sleep 2
+      echo "Another deployment is already running for $STACK_NAME (PID $prev_pid)." >&2
+      exit 1
     fi
     rm -f "$LOCK_FILE"
   fi
 
   (
-    echo $$ > "$LOCK_FILE"
+    echo "$BASHPID" > "$LOCK_FILE"
     trap 'rm -f "$LOCK_FILE"' EXIT
     set -euo pipefail
     START_TS=$(date +%s)
 
+    requested_image_tag="$IMAGE_TAG"
+    requested_image_repo="$IMAGE_REPO"
+    requested_stack_name="$STACK_NAME"
+    requested_stack_file="$STACK_FILE"
     set -a
     source /etc/environment 2>/dev/null || true
     set +a
+    IMAGE_TAG="$requested_image_tag"
+    IMAGE_REPO="$requested_image_repo"
+    STACK_NAME="$requested_stack_name"
+    STACK_FILE="$requested_stack_file"
 
     log "🚀 Deploying stack: $STACK_NAME"
     log "📦 Using image: $IMAGE_REPO:$IMAGE_TAG"
@@ -136,14 +154,16 @@ main() {
     if ! $skip_deploy; then
       image_ref="$IMAGE_REPO:$IMAGE_TAG"
       log "📥 Pulling image: $image_ref"
-      if ! docker pull "$image_ref" >/dev/null 2>&1; then
+      if ! docker pull "$image_ref"; then
         log "[❌] Failed to pull image: $image_ref"
         exit 1
       fi
 
       if [[ "$IMAGE_TAG" == "latest" ]]; then
         log "🔍 Resolving digest for latest tag..."
-        image_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image_ref" 2>/dev/null || true)
+        image_digest=$(docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' \
+          "$image_ref" 2>/dev/null | awk -v repo="$IMAGE_REPO" \
+          'index($0, repo "@") == 1 { print; exit }')
         if [[ -z "$image_digest" ]]; then
           log "[❌] Failed to resolve digest for $image_ref"
           exit 1
@@ -154,19 +174,15 @@ main() {
         log "✅ Using specific tag: $image_ref"
       fi
 
-      deploy_digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image_ref" 2>/dev/null | awk -F'@' '{print $2}')
-      if [[ -n "$deploy_digest" ]]; then
-        mkdir -p "$DIGEST_DIR"
-        digest_log="$DIGEST_DIR/${STACK_NAME}_image_digests.log"
-        echo "$deploy_digest" >> "$digest_log"
-        tail -n 5 "$digest_log" > "$digest_log.tmp" && mv "$digest_log.tmp" "$digest_log"
-        log "📝 Recorded digest: $deploy_digest"
-      fi
+      deploy_digest=$(docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' \
+        "$image_ref" 2>/dev/null | awk -v repo="$IMAGE_REPO" -F'@' \
+        'index($0, repo "@") == 1 { print $2; exit }')
 
       update_services=true
       if [[ -z $(docker stack services "$STACK_NAME" --format '{{.Name}}') ]]; then
         log "⚙️ Stack '$STACK_NAME' is missing. Deploying from scratch..."
-        if ! IMAGE_NAME="$image_ref" docker stack deploy -c "$STACK_FILE" --with-registry-auth "$STACK_NAME" >/dev/null 2>&1; then
+        if ! IMAGE_NAME="$image_ref" DOCKER_IMAGE="$IMAGE_REPO" IMAGE_TAG="$IMAGE_TAG" \
+          docker stack deploy -c "$STACK_FILE" --with-registry-auth "$STACK_NAME"; then
           log "[❌] Failed to deploy stack: $STACK_NAME"
           exit 1
         fi
@@ -182,6 +198,12 @@ main() {
         for service_name in "${stack_services[@]}"; do
           if ! docker service inspect "$service_name" >/dev/null 2>&1; then
             log "[⚠️] Skipping not found service: $service_name"
+            continue
+          fi
+          service_image=$(docker service inspect "$service_name" \
+            --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}')
+          if [[ "$service_image" != "$IMAGE_REPO:"* && "$service_image" != "$IMAGE_REPO@"* ]]; then
+            log "ℹ️ Skipping service with a different image repository: $service_name ($service_image)"
             continue
           fi
           log "🔄 Updating service: $service_name"
@@ -211,6 +233,14 @@ main() {
         log "ℹ️ Skipped update — stack was just deployed."
       fi
 
+      if [[ -n "$deploy_digest" ]]; then
+        mkdir -p "$DIGEST_DIR"
+        digest_log="$DIGEST_DIR/${STACK_NAME}_image_digests.log"
+        echo "$deploy_digest" >> "$digest_log"
+        tail -n 5 "$digest_log" > "$digest_log.tmp" && mv "$digest_log.tmp" "$digest_log"
+        log "📝 Recorded successful deployment digest: $deploy_digest"
+      fi
+
       deploy_duration=$(( $(date +%s) - START_TS ))
       log "🏁 Deploy completed in ${deploy_duration}s"
     else
@@ -229,9 +259,9 @@ main() {
   ) >> "$LOG_FILE" 2>&1 &
   deploy_pid=$!
 
-  # CI and interactive recovery runs can wait for the real deployment result
-  # instead of returning successfully while the background job later fails.
-  if [[ "${DEPLOY_FOREGROUND:-false}" == "true" ]]; then
+  # Foreground is the safe default so CI receives the actual deployment result.
+  # Background mode remains available for callers that explicitly need it.
+  if [[ "${DEPLOY_BACKGROUND:-false}" != "true" ]]; then
     wait "$deploy_pid"
   fi
 }

@@ -21,6 +21,11 @@ if [[ -z "$IMAGE_REPO" ]]; then
   exit 1
 fi
 
+if [[ "$DRY_RUN" != "0" && "$DRY_RUN" != "1" ]]; then
+  echo "Error: DRY_RUN must be 0 or 1." >&2
+  exit 1
+fi
+
 # === State & logging ===
 DELETED_IMAGE_COUNT=0
 log_message() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"; }
@@ -71,7 +76,7 @@ remove_image_and_tags() {
 
   mapfile -t REPO_REFS < <(
     docker inspect --format='{{range .RepoTags}}{{.}}{{"\n"}}{{end}}{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' "$img_id" 2>/dev/null |
-      grep -E "^${IMAGE_REPO}(:|@)" || true
+      awk -v repo="$IMAGE_REPO" 'index($0, repo ":") == 1 || index($0, repo "@") == 1' || true
   )
 
   for ref in "${REPO_REFS[@]}"; do
@@ -128,9 +133,6 @@ main() {
     SWARM_MANAGER="false"
     log_message "ℹ️ Swarm mode: inactive (service digest check will be empty)"
   fi
-
-  log_message "🧯 Removing exited containers (if any)..."
-  docker ps -aq -f status=exited | xargs -r docker rm >/dev/null 2>&1 || true
 
   log_message "🧯 Removing non-running containers for repo: $IMAGE_REPO"
   mapfile -t STALE_CONTAINERS < <(

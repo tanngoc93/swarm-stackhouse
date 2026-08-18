@@ -59,10 +59,14 @@ main() {
   log "⏳ Waiting for cleanup tasks..."
   local start_ts="$(date +%s)"
   while true; do
-    task_state=$(docker service ps "$service_name" --no-trunc --format "{{.CurrentState}}" 2>/dev/null | head -n1)
-    log "State: ${task_state:-<pending>}"
+    mapfile -t task_states < <(
+      docker service ps "$service_name" --no-trunc \
+        --format '{{.Name}}|{{.CurrentState}}|{{.Error}}' 2>/dev/null |
+        awk -F'|' '$1 !~ /^[[:space:]]*\\_/'
+    )
+    log "States: ${task_states[*]:-<pending>}"
 
-    if [[ -z "$task_state" ]]; then
+    if [[ ${#task_states[@]} -eq 0 ]]; then
       if (( $(date +%s) - start_ts >= wait_timeout )); then
         log "❌ Cleanup service did not start within ${wait_timeout}s"
         exit 1
@@ -71,13 +75,18 @@ main() {
       continue
     fi
 
-    if [[ "$task_state" == *"Complete"* ]] || [[ "$task_state" == *"Shutdown"* ]]; then
-      log "✅ Cleanup finished"
-      break
-    fi
+    all_complete=1
+    for task_state in "${task_states[@]}"; do
+      if [[ "$task_state" == *"Failed"* ]] || [[ "$task_state" == *"Rejected"* ]]; then
+        log "❌ Cleanup failed: $task_state"
+        docker service ps "$service_name" --no-trunc || true
+        exit 1
+      fi
+      [[ "$task_state" == *"Complete"* ]] || all_complete=0
+    done
 
-    if [[ "$task_state" == *"Failed"* ]]; then
-      log "❌ Cleanup failed"
+    if [[ "$all_complete" -eq 1 ]]; then
+      log "✅ Cleanup finished"
       break
     fi
 
