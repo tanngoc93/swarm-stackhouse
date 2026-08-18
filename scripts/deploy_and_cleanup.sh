@@ -18,6 +18,54 @@ set -euo pipefail
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$STACK_NAME|$IMAGE_TAG] $1"; }
 require() { command -v "$1" >/dev/null 2>&1 || { echo "command not found: $1" >&2; exit 1; }; }
 
+update_one_shot_service() {
+  local service_name="$1"
+  local image_ref="$2"
+  local previous_task_id task_id task_state exit_code task_error
+
+  previous_task_id=$(docker service ps "$service_name" --no-trunc \
+    --format '{{.ID}}' | head -n 1)
+
+  # A migration task is expected to exit after completing. Running service
+  # update in its default attached mode treats that successful exit as an
+  # early termination and returns non-zero, pausing the whole deployment.
+  if ! docker service update --detach=true --image "$image_ref" --force "$service_name"; then
+    return 1
+  fi
+
+  for _ in $(seq 1 120); do
+    task_id=$(docker service ps "$service_name" --no-trunc \
+      --format '{{.ID}}' | head -n 1)
+
+    if [[ -n "$task_id" && "$task_id" != "$previous_task_id" ]]; then
+      task_state=$(docker inspect --format '{{.Status.State}}' "$task_id" 2>/dev/null || true)
+      case "$task_state" in
+        complete)
+          exit_code=$(docker inspect \
+            --format '{{if .Status.ContainerStatus}}{{.Status.ContainerStatus.ExitCode}}{{else}}1{{end}}' \
+            "$task_id" 2>/dev/null || echo 1)
+          if [[ "$exit_code" == "0" ]]; then
+            return 0
+          fi
+          task_error=$(docker inspect --format '{{.Status.Err}}' "$task_id" 2>/dev/null || true)
+          log "[❌] One-shot task exited with code $exit_code: $task_error"
+          return 1
+          ;;
+        failed|rejected|orphaned)
+          task_error=$(docker inspect --format '{{.Status.Err}}' "$task_id" 2>/dev/null || true)
+          log "[❌] One-shot task entered state '$task_state': $task_error"
+          return 1
+          ;;
+      esac
+    fi
+
+    sleep 2
+  done
+
+  log "[❌] Timed out waiting for one-shot service: $service_name"
+  return 1
+}
+
 main() {
   IMAGE_TAG="${IMAGE_TAG:-latest}"
   IMAGE_REPO="${IMAGE_REPO:-}"
@@ -137,7 +185,21 @@ main() {
             continue
           fi
           log "🔄 Updating service: $service_name"
-          if docker service update --image "$image_ref" --force "$service_name" >/dev/null 2>&1; then
+          restart_condition=$(docker service inspect "$service_name" \
+            --format '{{if .Spec.TaskTemplate.RestartPolicy}}{{.Spec.TaskTemplate.RestartPolicy.Condition}}{{end}}')
+          if [[ "$restart_condition" == "none" ]]; then
+            if update_one_shot_service "$service_name" "$image_ref"; then
+              update_result=0
+            else
+              update_result=$?
+            fi
+          elif docker service update --image "$image_ref" --force "$service_name"; then
+            update_result=0
+          else
+            update_result=$?
+          fi
+
+          if [[ "$update_result" -eq 0 ]]; then
             log "✅ Done updating: $service_name"
           else
             log "[❌] Failed to update: $service_name"
@@ -165,6 +227,13 @@ main() {
       log "[⚠️] Cleanup script not found or not executable: $CLEANUP_SCRIPT"
     fi
   ) >> "$LOG_FILE" 2>&1 &
+  deploy_pid=$!
+
+  # CI and interactive recovery runs can wait for the real deployment result
+  # instead of returning successfully while the background job later fails.
+  if [[ "${DEPLOY_FOREGROUND:-false}" == "true" ]]; then
+    wait "$deploy_pid"
+  fi
 }
 
 main "$@"
