@@ -53,16 +53,29 @@ get_primary_tag() {
   docker inspect --format='{{index .RepoTags 0}}' "$1" 2>/dev/null || echo "<untagged>"
 }
 
-# Helper: check if a local image ID is referenced by any Swarm service (by digest)
+# Helper: check whether a local image ID is referenced by any Swarm service.
+# Compare both readable tags and digests because deployments intentionally keep
+# dated tags in their service specs.
 image_used_by_service() {
   local img_id="$1"
-  mapfile -t DIGESTS < <(
-    docker inspect --format='{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' "$img_id" 2>/dev/null |
-      awk -F'@' 'NF==2{print $2}'
+  local image_ref used_ref image_digest used_digest
+  mapfile -t IMAGE_REFS < <(
+    docker inspect \
+      --format='{{range .RepoTags}}{{.}}{{"\n"}}{{end}}{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' \
+      "$img_id" 2>/dev/null
   )
-  for d in "${DIGESTS[@]:-}"; do
-    for u in "${USED_SERVICE_DIGESTS[@]:-}"; do
-      [[ "$d" == "$u" ]] && return 0
+
+  for image_ref in "${IMAGE_REFS[@]:-}"; do
+    for used_ref in "${USED_SERVICE_IMAGE_REFS[@]:-}"; do
+      [[ "$image_ref" == "$used_ref" ]] && return 0
+
+      # Docker may represent the same image as repo:tag@sha256:... in a
+      # service and repo@sha256:... in local RepoDigests.
+      if [[ "$image_ref" == *@* && "$used_ref" == *@* ]]; then
+        image_digest="${image_ref#*@}"
+        used_digest="${used_ref#*@}"
+        [[ "$image_digest" == "$used_digest" ]] && return 0
+      fi
     done
   done
   return 1
@@ -131,7 +144,7 @@ main() {
   else
     SWARM_ACTIVE=0
     SWARM_MANAGER="false"
-    log_message "ℹ️ Swarm mode: inactive (service digest check will be empty)"
+    log_message "ℹ️ Swarm mode: inactive (service image reference check will be empty)"
   fi
 
   log_message "🧯 Removing non-running containers for repo: $IMAGE_REPO"
@@ -154,17 +167,16 @@ main() {
   log_message "🧽 Removing dangling images (if any)..."
   docker images -f dangling=true -q | xargs -r docker rmi -f >/dev/null 2>&1 || true
 
-  USED_SERVICE_DIGESTS=()
+  USED_SERVICE_IMAGE_REFS=()
   if [[ "$SWARM_ACTIVE" -eq 1 && "$SWARM_MANAGER" == "true" ]]; then
-    mapfile -t USED_SERVICE_DIGESTS < <(
+    mapfile -t USED_SERVICE_IMAGE_REFS < <(
       docker service ls --format '{{.ID}}' 2>/dev/null |
       xargs -r -n1 docker service inspect --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}' 2>/dev/null |
-      awk -F'@' 'NF==2{print $2}' |
       sort -u
     )
-    log_message "🔎 Found ${#USED_SERVICE_DIGESTS[@]} service image digest(s) in use."
+    log_message "🔎 Found ${#USED_SERVICE_IMAGE_REFS[@]} service image reference(s) in use."
   else
-    log_message "🔎 Skipping service digest collection (not a manager)."
+    log_message "🔎 Skipping service image reference collection (not a manager)."
   fi
 
   log_message "🧾 Scanning local images for repo: $IMAGE_REPO"
@@ -182,7 +194,7 @@ main() {
 
     if [[ "$SWARM_ACTIVE" -eq 1 && "$SWARM_MANAGER" == "true" ]]; then
       if image_used_by_service "$IMG_ID"; then
-        log_message "🔒 In use by Swarm service digest: $PRIMARY_TAG ($IMG_ID)"
+        log_message "🔒 In use by Swarm service image reference: $PRIMARY_TAG ($IMG_ID)"
         continue
       fi
     fi

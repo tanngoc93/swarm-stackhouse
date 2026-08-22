@@ -17,6 +17,9 @@ require() { command -v "$1" >/dev/null 2>&1 || { log "command not found: $1"; ex
 
 # Globals used by cleanup trap; populated in main
 stack_name=""
+service_name=""
+default_network_name=""
+poll_interval=3
 deployed=0
 
 main() {
@@ -27,11 +30,11 @@ main() {
   stack_name="${STACK_NAME:-swarm-cleanup}"
   local image_repo="${IMAGE_REPO:-}"
   local wait_timeout=${WAIT_TIMEOUT:-300}
-  local poll_interval=${POLL_INTERVAL:-3}
+  poll_interval=${POLL_INTERVAL:-3}
   local cleanup_lock_file="${CLEANUP_LOCK_FILE:-/tmp/swarm-stackhouse-cleanup.lock}"
   local cleanup_lock_timeout="${CLEANUP_LOCK_TIMEOUT:-900}"
-  local service_name="${stack_name}_swarm_cleanup"
-  local default_network_name="${stack_name}_default"
+  service_name="${stack_name}_swarm_cleanup"
+  default_network_name="${stack_name}_default"
   deployed=0
 
   if ! [[ "$wait_timeout" =~ ^[0-9]+$ && "$poll_interval" =~ ^[0-9]+$ && \

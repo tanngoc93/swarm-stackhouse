@@ -32,7 +32,8 @@ update_one_shot_service() {
   # A migration task is expected to exit after completing. Running service
   # update in its default attached mode treats that successful exit as an
   # early termination and returns non-zero, pausing the whole deployment.
-  if ! docker service update --detach=true --image "$image_ref" --force "$service_name"; then
+  if ! docker service update --detach=true --no-resolve-image \
+    --image "$image_ref" --force "$service_name"; then
     return 1
   fi
 
@@ -169,20 +170,7 @@ main() {
         exit 1
       fi
 
-      if [[ "$IMAGE_TAG" == "latest" ]]; then
-        log "🔍 Resolving digest for latest tag..."
-        image_digest=$(docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' \
-          "$image_ref" 2>/dev/null | awk -v repo="$IMAGE_REPO" \
-          'index($0, repo "@") == 1 { print; exit }')
-        if [[ -z "$image_digest" ]]; then
-          log "[❌] Failed to resolve digest for $image_ref"
-          exit 1
-        fi
-        image_ref="$image_digest"
-        log "✅ Using digest: $image_ref"
-      else
-        log "✅ Using specific tag: $image_ref"
-      fi
+      log "✅ Deploying image tag without replacing it with a digest: $image_ref"
 
       deploy_digest=$(docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' \
         "$image_ref" 2>/dev/null | awk -v repo="$IMAGE_REPO" -F'@' \
@@ -192,7 +180,8 @@ main() {
       if [[ -z $(docker stack services "$STACK_NAME" --format '{{.Name}}') ]]; then
         log "⚙️ Stack '$STACK_NAME' is missing. Deploying from scratch..."
         if ! IMAGE_NAME="$image_ref" DOCKER_IMAGE="$IMAGE_REPO" IMAGE_TAG="$IMAGE_TAG" \
-          docker stack deploy -c "$STACK_FILE" --with-registry-auth "$STACK_NAME"; then
+          docker stack deploy -c "$STACK_FILE" --with-registry-auth \
+            --resolve-image never "$STACK_NAME"; then
           log "[❌] Failed to deploy stack: $STACK_NAME"
           exit 1
         fi
@@ -225,7 +214,8 @@ main() {
             else
               update_result=$?
             fi
-          elif docker service update --image "$image_ref" --force "$service_name"; then
+          elif docker service update --no-resolve-image \
+            --image "$image_ref" --force "$service_name"; then
             update_result=0
           else
             update_result=$?

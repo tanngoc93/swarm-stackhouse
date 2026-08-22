@@ -9,7 +9,7 @@ cleaning unused copies of that image from every Swarm node.
 A normal deployment follows this order:
 
 1. Pull `IMAGE_REPO:IMAGE_TAG` on the manager.
-2. Resolve `latest` to an immutable digest.
+2. Verify the registry digest for history while preserving the requested tag.
 3. Create the stack if it does not exist, or update matching services one at a
    time.
 4. Wait for one-shot services such as database migrations to exit successfully.
@@ -72,8 +72,9 @@ The generator creates an executable file named similar to
 IMAGE_TAG=v1.4.2 ./deploy_my-app_1787020000.sh
 ```
 
-Immutable build tags are recommended. `latest` is supported and is resolved to
-its registry digest before services are updated:
+Unique dated build tags are recommended. The exact requested tag remains visible
+in Docker Swarm service specs; its digest is recorded only for deployment
+history and rollback:
 
 ```bash
 IMAGE_TAG=latest ./deploy_my-app_1787020000.sh
