@@ -17,6 +17,10 @@
 #   IMAGE_REPO  : image repo (default: myorg/myapp)
 #   STACK_NAME  : stack name (default: app_stack)
 #   STACK_FILE  : stack file path (default: /root/docker/app-stack.yml)
+#   GLOBAL_DEPLOY_LOCK_FILE    : shared deploy lock on this manager
+#   GLOBAL_DEPLOY_LOCK_TIMEOUT : seconds to wait for the lock (default: 7200)
+#   DEPLOY_QUEUE_BACKGROUND    : enqueue on the manager and return (default: true)
+#   DEPLOY_QUEUE_LOG_FILE      : shared queue status log
 #
 # Notes:
 #   - Designed to be idempotent and safe to re-run.
@@ -37,6 +41,13 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 IMAGE_REPO="${IMAGE_REPO:-myorg/myapp}"
 STACK_NAME="${STACK_NAME:-app_stack}"
 STACK_FILE="${STACK_FILE:-/root/docker/app-stack.yml}"
+GLOBAL_DEPLOY_LOCK_FILE="${GLOBAL_DEPLOY_LOCK_FILE:-/tmp/swarm-stackhouse-deploy.lock}"
+GLOBAL_DEPLOY_LOCK_TIMEOUT="${GLOBAL_DEPLOY_LOCK_TIMEOUT:-7200}"
+GLOBAL_DEPLOY_LOCK_FD=200
+DEPLOY_QUEUE_BACKGROUND="${DEPLOY_QUEUE_BACKGROUND:-true}"
+DEPLOY_QUEUE_LOG_FILE="${DEPLOY_QUEUE_LOG_FILE:-/tmp/swarm-stackhouse-deploy-queue.log}"
+DEPLOY_QUEUE_WORKER="${DEPLOY_QUEUE_WORKER:-false}"
+DEPLOY_REQUEST_ID="${DEPLOY_REQUEST_ID:-}"
 
 # -------- Utilities --------
 log() { printf "[%s] %s\n" "$(date '+%F %T')" "$*"; }
@@ -49,6 +60,73 @@ abort() {
 require() {
   # Ensure a required command exists
   command -v "$1" >/dev/null 2>&1 || abort "'$1' is not installed"
+}
+
+acquire_global_deploy_lock() {
+  require flock
+
+  if [[ "${GLOBAL_DEPLOY_LOCK_HELD:-false}" == "true" && \
+        -e "/proc/$$/fd/$GLOBAL_DEPLOY_LOCK_FD" ]]; then
+    return 0
+  fi
+
+  [[ "$GLOBAL_DEPLOY_LOCK_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || \
+    abort "GLOBAL_DEPLOY_LOCK_TIMEOUT must be a positive integer"
+
+  exec 200>"$GLOBAL_DEPLOY_LOCK_FILE"
+  log "🔒 Waiting up to ${GLOBAL_DEPLOY_LOCK_TIMEOUT}s for global deploy lock: $GLOBAL_DEPLOY_LOCK_FILE"
+  flock -w "$GLOBAL_DEPLOY_LOCK_TIMEOUT" "$GLOBAL_DEPLOY_LOCK_FD" || \
+    abort "Timed out waiting for global deploy lock: $GLOBAL_DEPLOY_LOCK_FILE"
+
+  export GLOBAL_DEPLOY_LOCK_HELD=true
+  log "🔒 Acquired global deploy lock for stack: $STACK_NAME"
+}
+
+queue_log() {
+  printf '[%s] [request=%s] [stack=%s|tag=%s] %s\n' \
+    "$(date '+%F %T')" "$DEPLOY_REQUEST_ID" "$STACK_NAME" "$IMAGE_TAG" "$*"
+}
+
+resolve_script_path() {
+  local script_dir script_name
+  script_dir="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+  script_name="$(basename "${BASH_SOURCE[0]}")"
+  printf '%s/%s\n' "$script_dir" "$script_name"
+}
+
+enqueue_deployment() {
+  local script_path queue_dir worker_pid
+
+  case "$DEPLOY_QUEUE_BACKGROUND" in
+    true|false) ;;
+    *) abort "DEPLOY_QUEUE_BACKGROUND must be true or false" ;;
+  esac
+
+  DEPLOY_REQUEST_ID="${DEPLOY_REQUEST_ID:-$(date '+%Y%m%dT%H%M%S')-$$}"
+  script_path="$(resolve_script_path)"
+  queue_dir="$(dirname "$DEPLOY_QUEUE_LOG_FILE")"
+  mkdir -p "$queue_dir"
+
+  nohup env \
+    DEPLOY_QUEUE_WORKER=true \
+    DEPLOY_REQUEST_ID="$DEPLOY_REQUEST_ID" \
+    DEPLOY_QUEUE_LOG_FILE="$DEPLOY_QUEUE_LOG_FILE" \
+    "$script_path" "$@" \
+    </dev/null >>"$DEPLOY_QUEUE_LOG_FILE" 2>&1 &
+  worker_pid=$!
+
+  queue_log "QUEUED worker_pid=$worker_pid" >> "$DEPLOY_QUEUE_LOG_FILE"
+  log "✅ Deployment queued on the Swarm manager (request: $DEPLOY_REQUEST_ID, worker PID: $worker_pid)."
+  log "📝 Queue log: $DEPLOY_QUEUE_LOG_FILE"
+}
+
+worker_exit_log() {
+  local status=$?
+  if [[ "$status" -eq 0 ]]; then
+    queue_log "COMPLETED"
+  else
+    queue_log "FAILED exit_code=$status"
+  fi
 }
 
 get_remote_head() {
@@ -133,12 +211,17 @@ run_deploy() {
   IMAGE_REPO="$IMAGE_REPO" \
   STACK_NAME="$STACK_NAME" \
   STACK_FILE="$STACK_FILE" \
+  DEPLOY_BACKGROUND=false \
   "$deploy_script"
 }
 
 # -------- Main flow --------
 main() {
   require git
+  require flock
+  queue_log "WAITING for global deploy lock"
+  acquire_global_deploy_lock
+  queue_log "STARTED"
 
   # 1) Resolve remote HEAD
   local remote_head
@@ -177,4 +260,22 @@ main() {
   run_deploy
 }
 
-main "$@"
+case "$DEPLOY_QUEUE_BACKGROUND" in
+  true|false) ;;
+  *) abort "DEPLOY_QUEUE_BACKGROUND must be true or false" ;;
+esac
+case "$DEPLOY_QUEUE_WORKER" in
+  true|false) ;;
+  *) abort "DEPLOY_QUEUE_WORKER must be true or false" ;;
+esac
+DEPLOY_REQUEST_ID="${DEPLOY_REQUEST_ID:-$(date '+%Y%m%dT%H%M%S')-$$}"
+
+if [[ "$DEPLOY_QUEUE_BACKGROUND" == "true" && "$DEPLOY_QUEUE_WORKER" != "true" ]]; then
+  require nohup
+  enqueue_deployment "$@"
+else
+  if [[ "$DEPLOY_QUEUE_WORKER" == "true" ]]; then
+    trap worker_exit_log EXIT
+  fi
+  main "$@"
+fi

@@ -16,14 +16,15 @@ A normal deployment follows this order:
 5. Record the digest only after the deployment succeeds.
 6. Run the optional image cleanup job on every Swarm node.
 
-The deploy command runs in the foreground by default, so CI receives the real
-exit status. Concurrent deployments of the same stack are rejected by a lock
-instead of terminating the deployment already in progress.
+The generated wrapper enqueues a detached worker on the Swarm manager and
+returns to CI immediately. Workers share one blocking lock, so concurrent
+triggers enter the deploy critical section one at a time without consuming CI
+runtime while they wait. The default server-side wait limit is two hours.
 
 ## Requirements
 
 - Bash 4 or newer
-- `git`, `curl`, and the Docker CLI
+- `git`, `curl`, `flock`, `nohup`, and the Docker CLI
 - A Docker Swarm manager with access to `/var/run/docker.sock`
 - Registry credentials already configured with `docker login` when the image is
   private
@@ -110,9 +111,22 @@ Common optional variables:
 | `DIGEST_DIR` | `digests/` | Successful digest history |
 | `DEPLOY_BACKGROUND` | `false` | Return immediately while deployment continues |
 | `CLEANUP_SCRIPT` | `scripts/run_swarm_cleanup.sh` | Cleanup entry point |
+| `GLOBAL_DEPLOY_LOCK_FILE` | `/tmp/swarm-stackhouse-deploy.lock` | Manager-wide deployment lock |
+| `GLOBAL_DEPLOY_LOCK_TIMEOUT` | `7200` | Seconds a trigger waits for the deployment lock |
 
-Avoid `DEPLOY_BACKGROUND=true` in CI because the caller cannot receive a later
-deployment failure.
+Generated wrappers also accept `DEPLOY_QUEUE_BACKGROUND` (default `true`) and
+`DEPLOY_QUEUE_LOG_FILE` (default
+`/tmp/swarm-stackhouse-deploy-queue.log`). Immediate CI success means the
+request was accepted by the manager; the eventual deployment result is written
+to the shared log. Set `DEPLOY_QUEUE_BACKGROUND=false` for a foreground/manual
+wrapper run when the caller must receive the final exit status.
+
+The generated wrapper acquires the global lock before refreshing
+`/tmp/swarm-stackhouse`, and the lock remains held through migration, rollout,
+verification, digest recording, and cleanup. Direct calls to
+`deploy_and_cleanup.sh` acquire the same lock. If a detached worker times out or
+the deployment fails, it records `FAILED` with the request, stack, tag, and exit
+code in the shared queue log.
 
 ## One-shot migration services
 
@@ -168,6 +182,11 @@ service. Each node clones this repository and removes unused images belonging to
 `IMAGE_REPO`. Images referenced by running containers or Swarm services are
 kept. Containers and images belonging to other repositories are not removed.
 
+Cleanup also has its own blocking lock because every app uses the same
+`swarm-cleanup` stack. The lock is held until the temporary service and default
+network have actually disappeared; this also protects direct cleanup calls that
+run outside the normal deployment queue.
+
 Preview cleanup without deleting images:
 
 ```bash
@@ -201,9 +220,17 @@ docker stack services my-app
 docker stack ps my-app --no-trunc
 ```
 
-If a deploy reports that another deployment is running, check the PID recorded
-in `/tmp/deploy_<STACK_NAME>_uniq.pid`. A stale lock is removed automatically;
-do not delete a lock belonging to a live deployment.
+CI prints the request ID and detached worker PID after enqueueing. Follow all
+queued deployments from one place:
+
+```bash
+tail -f /tmp/swarm-stackhouse-deploy-queue.log
+```
+
+The log records `QUEUED`, `WAITING`, `STARTED`, and either `COMPLETED` or
+`FAILED`. A worker exceeding `GLOBAL_DEPLOY_LOCK_TIMEOUT` records `FAILED` and
+exits on the manager; it does not keep the CircleCI job open. Per-stack PID
+guards remain as a second layer of protection.
 
 ## Sample stack
 

@@ -15,6 +15,8 @@ set -euo pipefail
 #   CLEANUP_STACK_NAME  Stack name used by the cleanup script (default: swarm-cleanup)
 #   DIGEST_DIR        Directory to store image digest logs (default: ../digests)
 #   DEPLOY_BACKGROUND Run asynchronously when true (default: false)
+#   GLOBAL_DEPLOY_LOCK_FILE    Shared lock for all deployments on this manager
+#   GLOBAL_DEPLOY_LOCK_TIMEOUT Seconds to wait for the shared lock (default: 7200)
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$STACK_NAME|$IMAGE_TAG] $1"; }
 require() { command -v "$1" >/dev/null 2>&1 || { echo "command not found: $1" >&2; exit 1; }; }
@@ -80,6 +82,12 @@ main() {
   CLEANUP_STACK_FILE="${CLEANUP_STACK_FILE:-$REPO_ROOT/docker/cleanup-stack.yml}"
   CLEANUP_STACK_NAME="${CLEANUP_STACK_NAME:-swarm-cleanup}"
   DIGEST_DIR="${DIGEST_DIR:-$REPO_ROOT/digests}"
+
+  # Direct callers acquire the global lock here. Generated wrappers acquire it
+  # earlier so checkout refresh and stack reconciliation are protected too.
+  # shellcheck source=scripts/deploy_lock.sh
+  source "$SCRIPT_DIR/deploy_lock.sh"
+  acquire_global_deploy_lock "$STACK_NAME"
 
   mkdir -p "$(dirname "$LOG_FILE")"
 
