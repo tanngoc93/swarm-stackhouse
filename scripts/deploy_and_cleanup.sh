@@ -83,11 +83,11 @@ main() {
   CLEANUP_STACK_NAME="${CLEANUP_STACK_NAME:-swarm-cleanup}"
   DIGEST_DIR="${DIGEST_DIR:-$REPO_ROOT/digests}"
 
-  # Direct callers acquire the global lock here. Generated wrappers acquire it
-  # earlier so checkout refresh and stack reconciliation are protected too.
+  # The worker acquires this lock inside its background subshell. That lets a
+  # CI caller using DEPLOY_BACKGROUND=true return immediately while the
+  # manager-side worker waits. Generated wrappers pass an inherited lock.
   # shellcheck source=scripts/deploy_lock.sh
   source "$SCRIPT_DIR/deploy_lock.sh"
-  acquire_global_deploy_lock "$STACK_NAME"
 
   mkdir -p "$(dirname "$LOG_FILE")"
 
@@ -108,16 +108,18 @@ main() {
     exit 1
   fi
 
-  if [[ -f "$LOCK_FILE" ]]; then
-    prev_pid=$(cat "$LOCK_FILE" 2>/dev/null || true)
-    if ps -p "$prev_pid" >/dev/null 2>&1; then
-      echo "Another deployment is already running for $STACK_NAME (PID $prev_pid)." >&2
-      exit 1
-    fi
-    rm -f "$LOCK_FILE"
-  fi
-
   (
+    acquire_global_deploy_lock "$STACK_NAME"
+
+    if [[ -f "$LOCK_FILE" ]]; then
+      prev_pid=$(cat "$LOCK_FILE" 2>/dev/null || true)
+      if ps -p "$prev_pid" >/dev/null 2>&1; then
+        echo "Another deployment is already running for $STACK_NAME (PID $prev_pid)." >&2
+        exit 1
+      fi
+      rm -f "$LOCK_FILE"
+    fi
+
     echo "$BASHPID" > "$LOCK_FILE"
     trap 'rm -f "$LOCK_FILE"' EXIT
     set -euo pipefail
