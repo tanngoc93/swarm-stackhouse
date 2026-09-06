@@ -9,7 +9,7 @@ set -euo pipefail
 #   STACK_NAME       Name of the stack (required)
 #   STACK_FILE       Path to stack file (required)
 #   LOG_FILE         Output log (default: <repo_root>/log/deploy_${STACK_NAME}_uniq.log)
-#   LOCK_FILE        PID lock file (default: /tmp/deploy_${STACK_NAME}_uniq.pid)
+#   LOCK_FILE        Stable flock file containing the worker PID (default: /tmp/deploy_${STACK_NAME}_uniq.pid)
 #   CLEANUP_SCRIPT      Script to run after deployment (default: ./run_swarm_cleanup.sh)
 #   CLEANUP_STACK_FILE  Stack file used by the cleanup script (default: ../docker/cleanup-stack.yml)
 #   CLEANUP_STACK_NAME  Stack name used by the cleanup script (default: swarm-cleanup)
@@ -112,17 +112,15 @@ main() {
   (
     acquire_global_deploy_lock "$STACK_NAME"
 
-    if [[ -f "$LOCK_FILE" ]]; then
-      prev_pid=$(cat "$LOCK_FILE" 2>/dev/null || true)
-      if ps -p "$prev_pid" >/dev/null 2>&1; then
-        echo "Another deployment is already running for $STACK_NAME (PID $prev_pid)." >&2
-        exit 1
-      fi
-      rm -f "$LOCK_FILE"
-    fi
-
-    echo "$BASHPID" > "$LOCK_FILE"
-    trap 'rm -f "$LOCK_FILE"' EXIT
+    # Share the same stable inode as migration-first runners. Never unlink
+    # this file: replacing it lets different runners lock different inodes.
+    exec 199<>"$LOCK_FILE"
+    log "Waiting for stack deploy lock: $LOCK_FILE"
+    flock -w "${GLOBAL_DEPLOY_LOCK_TIMEOUT:-7200}" 199 || {
+      log "Timed out waiting for stack deploy lock: $LOCK_FILE"
+      exit 1
+    }
+    printf '%s\n' "$BASHPID" > "$LOCK_FILE"
     set -euo pipefail
     START_TS=$(date +%s)
 

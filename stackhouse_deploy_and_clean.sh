@@ -66,14 +66,16 @@ acquire_global_deploy_lock() {
   require flock
 
   if [[ "${GLOBAL_DEPLOY_LOCK_HELD:-false}" == "true" && \
-        -e "/proc/$$/fd/$GLOBAL_DEPLOY_LOCK_FD" ]]; then
+        "/proc/$BASHPID/fd/$GLOBAL_DEPLOY_LOCK_FD" -ef "$GLOBAL_DEPLOY_LOCK_FILE" ]] &&
+     flock -n "$GLOBAL_DEPLOY_LOCK_FD"; then
     return 0
   fi
 
   [[ "$GLOBAL_DEPLOY_LOCK_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || \
     abort "GLOBAL_DEPLOY_LOCK_TIMEOUT must be a positive integer"
 
-  exec 200>"$GLOBAL_DEPLOY_LOCK_FILE"
+  unset GLOBAL_DEPLOY_LOCK_HELD
+  exec 200>>"$GLOBAL_DEPLOY_LOCK_FILE"
   log "🔒 Waiting up to ${GLOBAL_DEPLOY_LOCK_TIMEOUT}s for global deploy lock: $GLOBAL_DEPLOY_LOCK_FILE"
   flock -w "$GLOBAL_DEPLOY_LOCK_TIMEOUT" "$GLOBAL_DEPLOY_LOCK_FD" || \
     abort "Timed out waiting for global deploy lock: $GLOBAL_DEPLOY_LOCK_FILE"

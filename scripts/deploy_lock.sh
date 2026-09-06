@@ -11,11 +11,6 @@ acquire_global_deploy_lock() {
   local lock_file="${GLOBAL_DEPLOY_LOCK_FILE:-/tmp/swarm-stackhouse-deploy.lock}"
   local lock_timeout="${GLOBAL_DEPLOY_LOCK_TIMEOUT:-7200}"
 
-  if [[ "${GLOBAL_DEPLOY_LOCK_HELD:-false}" == "true" && \
-        -e "/proc/$$/fd/$GLOBAL_DEPLOY_LOCK_FD" ]]; then
-    return 0
-  fi
-
   command -v flock >/dev/null 2>&1 || {
     echo "command not found: flock" >&2
     return 1
@@ -26,12 +21,22 @@ acquire_global_deploy_lock() {
     return 1
   fi
 
-  exec 200>"$lock_file"
+  # BASHPID identifies this shell even inside a background subshell. Verify
+  # both the inode and the lock; an environment marker alone is not ownership.
+  if [[ "${GLOBAL_DEPLOY_LOCK_HELD:-false}" == "true" && \
+        "/proc/$BASHPID/fd/$GLOBAL_DEPLOY_LOCK_FD" -ef "$lock_file" ]] &&
+     flock -n "$GLOBAL_DEPLOY_LOCK_FD"; then
+    return 0
+  fi
+
+  unset GLOBAL_DEPLOY_LOCK_HELD
+  exec 200>>"$lock_file"
   printf '[%s] Waiting up to %ss for global deploy lock: %s (%s)\n' \
     "$(date '+%F %T')" "$lock_timeout" "$lock_file" "$context"
 
   if ! flock -w "$lock_timeout" "$GLOBAL_DEPLOY_LOCK_FD"; then
     echo "Timed out waiting for global deploy lock: $lock_file ($context)" >&2
+    exec 200>&-
     return 1
   fi
 

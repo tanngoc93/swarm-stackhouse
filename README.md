@@ -129,6 +129,37 @@ verification, digest recording, and cleanup. Direct calls to
 the deployment fails, it records `FAILED` with the request, stack, tag, and exit
 code in the shared queue log.
 
+## Custom deployment runners (including FeedX)
+
+A custom migration-first runner must use the same manager lock as generated
+Stackhouse wrappers. Source the helper in the manager-side worker, before any
+status deployment, migration, service update, or cleanup:
+
+```bash
+source /tmp/swarm-stackhouse/scripts/deploy_lock.sh
+acquire_global_deploy_lock "feedx|$IMAGE_TAG" || exit 1
+bash /path/to/status-deploy.sh || exit 1
+exec /path/to/migration-first-deploy.sh
+```
+
+Keep the worker detached from SSH if the request must survive CI disconnects.
+Record `queued` before acquiring the lock, `running` only after acquisition,
+and a terminal success/failure after the commands finish. CI must account for
+both the two-hour queue wait and the rollout allowance; acceptance into the
+queue is not successful deployment. A CI monitoring timeout does not cancel
+the worker, so inspect its recorded status before retrying.
+
+The lock is inherited across Bash subshells and child scripts. Per-stack locks
+use a stable file inode shared with migration-first runners; never delete the
+lock file while a process might be waiting on it. These are bounded, blocking
+workers, not a durable FIFO queue: a manager reboot loses waiting processes.
+
+Run the focused Linux regression checks without deploying anything:
+
+```bash
+bash tests/deploy_lock_test.sh
+```
+
 ## One-shot migration services
 
 A migration service should exit after its command succeeds:
