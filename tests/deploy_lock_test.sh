@@ -76,8 +76,10 @@ cat > "$test_dir/bin/docker" <<'MOCK'
 #!/usr/bin/env bash
 case "$1 $2" in
   'info --format') echo true ;;
+  'pull example/app:test') exit 0 ;;
+  'image inspect') echo 'example/app@sha256:1111111111111111111111111111111111111111111111111111111111111111' ;;
   'stack services') echo demo_web ;;
-  'service inspect') echo example/app:test ;;
+  'service inspect') echo 'example/app@sha256:1111111111111111111111111111111111111111111111111111111111111111' ;;
   *) echo "Unexpected Docker command" >&2; exit 99 ;;
 esac
 MOCK
@@ -105,10 +107,62 @@ kill -0 "$worker"
 ! grep -q 'No deployment needed' "$LOG_FILE"
 touch "$test_dir/stack-release"
 wait "$stack_holder"
-wait "$worker"
+if ! wait "$worker"; then
+  cat "$LOG_FILE" >&2
+  exit 1
+fi
 grep -q 'No deployment needed' "$LOG_FILE"
 [[ "$(stat -c %i "$LOCK_FILE")" == "$inode_before" ]]
 echo "PASS: actual deploy worker waits on existing stack lock and preserves inode"
+
+deploy_source="$repo_root/scripts/deploy_and_cleanup.sh"
+grep -Fq 'IMAGE_NAME="$image_digest_ref"' "$deploy_source"
+grep -Fq -- '--image "$image_digest_ref"' "$deploy_source"
+! grep -Fq 'IMAGE_NAME="$tagged_image"' "$deploy_source"
+! grep -Fq -- '--image "$tagged_image"' "$deploy_source"
+echo "PASS: deploy worker pins stack and service updates to the verified digest"
+
+# Exercise an actual service update and record the exact image argument passed
+# to Docker. The mutable source tag may be pulled, but it must never reach the
+# Swarm service specification.
+update_bin="$test_dir/update-bin"
+update_log="$test_dir/update-docker.log"
+mkdir "$update_bin"
+cat > "$update_bin/docker" <<'MOCK'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$MOCK_DOCKER_LOG"
+case "$1 $2" in
+  'info --format') echo true ;;
+  'pull example/app:test') exit 0 ;;
+  'image inspect') echo 'example/app@sha256:1111111111111111111111111111111111111111111111111111111111111111' ;;
+  'stack services') echo demo_web ;;
+  'service inspect')
+    if [[ "$*" == *'ContainerSpec.Image'* ]]; then
+      echo 'example/app:old'
+    elif [[ "$*" == *'RestartPolicy'* ]]; then
+      echo any
+    fi
+    ;;
+  'service update') exit 0 ;;
+  *) echo "Unexpected Docker command: $*" >&2; exit 99 ;;
+esac
+MOCK
+chmod +x "$update_bin/docker"
+MOCK_DOCKER_LOG="$update_log" \
+PATH="$update_bin:$PATH" \
+LOCK_FILE="$test_dir/update-stack.lock" \
+LOG_FILE="$test_dir/update-deploy.log" \
+IMAGE_REPO=example/app \
+IMAGE_TAG=test \
+STACK_NAME=demo \
+STACK_FILE="$test_dir/stack.yml" \
+CLEANUP_SCRIPT="$test_dir/no-cleanup" \
+timeout 10 bash "$repo_root/scripts/deploy_and_cleanup.sh"
+grep -Fq \
+  'service update --no-resolve-image --image example/app@sha256:1111111111111111111111111111111111111111111111111111111111111111 --force demo_web' \
+  "$update_log"
+! grep -Fq 'service update --no-resolve-image --image example/app:test' "$update_log"
+echo "PASS: service update receives the verified digest and never the mutable tag"
 
 if GLOBAL_DEPLOY_LOCK_TIMEOUT=invalid bash -euc \
   'source "$LOCK_HELPER"; acquire_global_deploy_lock invalid' >/dev/null 2>&1; then

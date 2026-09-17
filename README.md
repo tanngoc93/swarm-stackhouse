@@ -8,13 +8,12 @@ cleaning unused copies of that image from every Swarm node.
 
 A normal deployment follows this order:
 
-1. Pull `IMAGE_REPO:IMAGE_TAG` on the manager.
-2. Verify the registry digest for history while preserving the requested tag.
-3. Create the stack if it does not exist, or update matching services one at a
-   time.
-4. Wait for one-shot services such as database migrations to exit successfully.
-5. Record the digest only after the deployment succeeds.
-6. Run the optional image cleanup job on every Swarm node.
+1. Pull `IMAGE_REPO:IMAGE_TAG` on the manager and resolve its registry digest.
+2. Create the stack if it does not exist, or update matching services one at a
+   time, using the immutable `IMAGE_REPO@sha256:...` reference.
+3. Wait for one-shot services such as database migrations to exit successfully.
+4. Record the digest only after the deployment succeeds.
+5. Run the optional image cleanup job on every Swarm node.
 
 The generated wrapper enqueues a detached worker on the Swarm manager and
 returns to CI immediately. Workers share one blocking lock, so concurrent
